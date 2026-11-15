@@ -130,7 +130,8 @@ export function AgentCluster(props: Props) {
   const place: BubblePlacement = narrow ? 'above' : placement;
 
   // Coming out of the chat box, the bubble waits until the droplet has fully formed.
-  const inBox = anchor === 'absorbed' || anchor === 'hidden';
+  // Only rising out of the box counts. Coming back from hidden is a different, in-place return.
+  const inBox = anchor === 'absorbed';
   const wasInBox = useRef(inBox);
   const [emerging, setEmerging] = useState(false);
   useLayoutEffect(() => {
@@ -147,7 +148,7 @@ export function AgentCluster(props: Props) {
 
   // Start at the intended anchor, rather than flashing at the bottom-right dock.
   const [target, setTarget] = useState<Point>(() => {
-    if (anchor === 'composer' || anchor === 'absorbed' || anchor === 'hidden') return composerPoint();
+    if (anchor === 'composer' || anchor === 'absorbed') return composerPoint();
     return home ? clampToView(home) : dockPoint();
   });
   const arrived = useSpringPosition(clusterRef, target, reducedMotion || anchor === 'drag');
@@ -187,7 +188,11 @@ export function AgentCluster(props: Props) {
       let next: Point;
       if (anchor === 'drag' && drag) next = drag;
       else if (anchor === 'composer') next = composerPoint();
-      else if (anchor === 'absorbed' || anchor === 'hidden') next = absorbedPoint();
+      else if (anchor === 'hidden') {
+        // Hidden: stay exactly where he was. He fades out in place and comes back in place.
+        onReserve.current(0);
+        return;
+      } else if (anchor === 'absorbed') next = absorbedPoint();
       else next = home ? clampToView(home) : dockPoint();
       setTarget((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
 
@@ -212,7 +217,7 @@ export function AgentCluster(props: Props) {
   }, [anchor, place, drag, home, arrived, emerging, scene.name]);
 
   const presence: Presence =
-    arrived && anchor === 'absorbed' ? 'in' : arrived && anchor === 'hidden' ? 'gone' : 'out';
+    anchor === 'hidden' ? 'gone' : arrived && anchor === 'absorbed' ? 'in' : 'out';
   // The chat box keeps its outline until the droplet has left it.
   const absorbed = presence === 'in' || emerging;
   const onAbsorbed = useRef(props.onAbsorbedChange);
@@ -259,6 +264,7 @@ export function AgentCluster(props: Props) {
         draggable={!speaking && !emerging && presence !== 'gone'}
         label={speaking ? 'Layers' : 'Layers. Ask a question, or drag to move.'}
         onClick={props.onMascotClick}
+        onHide={props.actions.toggleHidden}
         onDrag={(centre) => setDrag(clampToView(centre))}
         onDrop={onDrop}
       />

@@ -45,7 +45,7 @@ const UNDER = ['var(--layer-orange)', 'var(--layer-red)', 'var(--layer-pink)'];
 const TAP_SLOP = 9;
 
 const SINK_MS = 800;
-const PLUCK_MS = 380;
+const PLUCK_MS = 240;
 /** Height of the eyes, in the mascot's 64px box, while they sit on the chat box. */
 const NIB_EYE_Y = 71.5;
 
@@ -78,6 +78,8 @@ interface Props {
   draggable: boolean;
   label: string;
   onClick: () => void;
+  /** Right-click: hide him. */
+  onHide: () => void;
   /** Positions are where the mascot's centre should be, in viewport pixels. */
   onDrag: (centre: Point) => void;
   onDrop: (centre: Point) => void;
@@ -105,6 +107,11 @@ export function Mascot(props: Props) {
     }
     if (reducedMotion) {
       setPhase(presence);
+      return;
+    }
+    if (presence === 'gone') {
+      // Hiding is its own thing: he shrinks away where he is. No trip to the chat box.
+      setPhase('gone');
       return;
     }
     if (from !== 'out') {
@@ -245,6 +252,10 @@ export function Mascot(props: Props) {
       aria-hidden={shown === 'gone' ? true : undefined}
       tabIndex={shown === 'gone' ? -1 : undefined}
       onClick={onClick}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        props.onHide();
+      }}
       onPointerDown={onPointerDown}
     >
       {/* Liquid layer: a pool on the edge of the chat box and a blob that merges with it.
@@ -252,6 +263,15 @@ export function Mascot(props: Props) {
       <span className="goo" aria-hidden="true">
         <span className="goo__pool" />
         <svg className="goo__blob" viewBox="0 0 64 64">
+          <path d={s.d} />
+        </svg>
+      </span>
+
+      {/* The same liquid shape, drawn crisp on top. The fused layer below supplies the neck
+          where he joins the box; this one keeps his outline exact, so nothing changes shape
+          when the real body takes over. */}
+      <span className="crisp" aria-hidden="true">
+        <svg className="crisp__blob" viewBox="0 0 64 64">
           <path d={s.d} />
         </svg>
       </span>

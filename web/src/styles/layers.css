@@ -284,7 +284,9 @@
 }
 
 .mascot__layer {
-  transform: translate(calc(var(--fan) * var(--i) * -3.4px), calc(var(--fan) * var(--i) * 3.4px));
+  transform-box: view-box;
+  transform-origin: 50% 8%;
+  transform: rotate(calc(var(--fan) * var(--i) * 5.5deg));
   transition: transform 460ms var(--ease-out);
 }
 
@@ -454,10 +456,10 @@
 @keyframes shuffle {
   0%,
   100% {
-    transform: translate(calc(var(--i) * -1.1px), calc(var(--i) * 1.1px));
+    transform: rotate(calc(var(--i) * 2deg));
   }
   50% {
-    transform: translate(calc(var(--i) * -3.6px), calc(var(--i) * 3.6px));
+    transform: rotate(calc(var(--i) * 6.5deg));
   }
 }
 
@@ -1269,7 +1271,15 @@ li[data-status='done'] .steps__mark {
   transition: transform 420ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.goo__blob {
+.crisp {
+  position: absolute;
+  inset: -14px -14px -36px;
+  clip-path: inset(0 0 22px 0);
+  pointer-events: none;
+}
+
+.goo__blob,
+.crisp__blob {
   position: absolute;
   left: 14px;
   top: 14px;
@@ -1291,10 +1301,6 @@ li[data-status='done'] .steps__mark {
 .mascot__melt {
   /* Keep all transitions within the same animation timeline. */
   transition: none;
-}
-
-.mascot[data-phase='sinking'] .mascot__melt {
-  animation: body-sink 800ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .mascot:is([data-phase='in'], [data-phase='gone']) .mascot__melt {
@@ -1347,14 +1353,33 @@ li[data-status='done'] .steps__mark {
   opacity: 1;
 }
 
+/*
+ * Forming and melting. Three things move together on one curve: the liquid (fused, for
+ * the neck), its crisp copy (for an exact outline), and the small eyes. The real body is
+ * swapped in or out in a single frame at the moment it is identical to the crisp copy,
+ * so there is nothing to see at the handover.
+ */
+
+/* While he forms or melts, the layers stay tucked and his gaze stays level. */
+.mascot:is([data-phase='rising'], [data-phase='sinking']) {
+  --fan: 0 !important;
+  --gaze-x: 0 !important;
+  --gaze-y: 0 !important;
+}
+
+.mascot:is([data-phase='rising'], [data-phase='sinking']) .mascot__eye {
+  ry: var(--eye-ry, 6px);
+  transition: none;
+}
+
 /* Forming */
-.mascot[data-phase='rising'] .goo__blob {
+.mascot[data-phase='rising'] :is(.goo__blob, .crisp__blob) {
   opacity: 1;
   animation: flow-up 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .mascot[data-phase='rising'] .goo__pool {
-  animation: pool-out 560ms cubic-bezier(0.4, 0, 0.6, 1) 80ms both;
+  animation: pool-out 480ms cubic-bezier(0.4, 0, 0.6, 1) 170ms both;
 }
 
 .mascot[data-phase='rising'] .nib-eyes {
@@ -1362,11 +1387,11 @@ li[data-status='done'] .steps__mark {
 }
 
 .mascot[data-phase='rising'] .mascot__melt {
-  animation: body-show 900ms linear both;
+  opacity: 0;
 }
 
 /* Melting */
-.mascot[data-phase='sinking'] .goo__blob {
+.mascot[data-phase='sinking'] :is(.goo__blob, .crisp__blob) {
   opacity: 1;
   animation: flow-down 800ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
@@ -1377,6 +1402,10 @@ li[data-status='done'] .steps__mark {
 
 .mascot[data-phase='sinking'] .nib-eyes {
   animation: eyes-down 800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.mascot[data-phase='sinking'] .mascot__melt {
+  opacity: 0;
 }
 
 @keyframes flow-up {
@@ -1415,58 +1444,32 @@ li[data-status='done'] .steps__mark {
   }
 }
 
+/* The eyes wait in the swell until the liquid has risen under them, then travel with it,
+   growing to exactly the size of his real eyes. */
 @keyframes eyes-up {
-  0%, 68% {
+  0%,
+  14% {
     opacity: 1;
-  }
-  84%, 100% {
-    opacity: 0;
-    transform: translateY(var(--eye-lift)) scale(1.33);
-  }
-  0% {
     transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(var(--eye-lift)) scale(1.6, 1.7);
   }
 }
 
 @keyframes eyes-down {
-  0%, 14% {
-    opacity: 0;
-    transform: translateY(var(--eye-lift)) scale(1.33);
-  }
-  34% {
+  0% {
     opacity: 1;
+    transform: translateY(var(--eye-lift)) scale(1.6, 1.7);
   }
-  /* The eyes drop a little ahead of the liquid, so they never ride above its surface. */
-  58% {
+  62% {
     opacity: 1;
-    transform: translateY(calc(var(--eye-lift) * 0.16)) scale(1.08);
+    transform: translateY(calc(var(--eye-lift) * 0.14)) scale(1.08);
   }
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes body-sink {
-  0%, 10% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  33%, 100% {
-    opacity: 0;
-    transform: translateY(3px) scale(0.94);
-  }
-}
-
-@keyframes body-show {
-  0%, 71% {
-    opacity: 0;
-  }
-  88% {
-    opacity: 0.65;
-  }
-  100% {
-    opacity: 1;
   }
 }
 
@@ -1494,17 +1497,17 @@ li[data-status='done'] .steps__mark {
   transition-delay: 0s !important;
 }
 
-/* ---------- Pulled out of the chat box by a drag ---------- */
+/* ---------- Pulled out of the chat box by a drag, or brought back from hidden ---------- */
 
-/* He grows into shape under the pointer. The swell on the box drains at once, the small
-   eyes hand over to the real ones as he grows, and the layers stay tucked until he is whole. */
+/* He is already whole and under the pointer: just a quick settle into full size, with
+   the layers held back until it finishes. The swell on the box is gone at once. */
 .mascot[data-phase='plucked'] {
   --fan: 0 !important;
 }
 
 .mascot[data-phase='plucked'] .mascot__melt {
-  transform-origin: 50% 70%;
-  animation: pluck 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transform-origin: 50% 60%;
+  animation: pluck 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .mascot[data-phase='plucked'] .mascot__bob {
@@ -1516,31 +1519,33 @@ li[data-status='done'] .steps__mark {
   transition: none;
 }
 
-.mascot:is([data-phase='plucked'], [data-phase='out']) .goo__pool {
-  transition: transform 140ms ease-out;
+.mascot:is([data-phase='plucked'], [data-phase='out'], [data-phase='gone']) .goo__pool {
+  transition: none;
 }
 
 @keyframes pluck {
   from {
-    opacity: 0;
-    transform: scale(0.45);
-  }
-  40% {
-    opacity: 1;
+    transform: scale(0.78);
   }
   to {
-    opacity: 1;
     transform: scale(1);
   }
 }
 
-/* ---------- Dragging over the chat box ---------- */
+/* ---------- Hidden ---------- */
 
-/* Held over the chat box, he leans in and looks down, ready to pour himself in. */
-.mascot[data-over] .mascot__svg {
-  transform: scale(0.92, 0.84) translateY(6px);
+/* Hiding: he shrinks away where he is. */
+.mascot[data-phase='gone'] .mascot__melt {
+  opacity: 0;
+  transform: scale(0.4);
+  transition:
+    opacity 180ms ease-in,
+    transform 180ms ease-in;
 }
 
+/* ---------- Dragging over the chat box ---------- */
+
+/* Held over the chat box, he looks down at it. No change of size, so nothing pops on release. */
 .mascot[data-over] {
   --gaze-y: 2.6;
   --fan: 0;
