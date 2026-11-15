@@ -7,6 +7,7 @@ import './styles/workspace.css';
 import './styles/layers.css';
 import './styles/lab.css';
 import './styles/rail.css';
+import './styles/bubble-extra.css';
 import App from './App';
 import { ManagerView } from './manager/ManagerView';
 import './styles/manager.css';

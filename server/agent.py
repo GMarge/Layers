@@ -9,6 +9,8 @@ import os
 import uuid
 
 from deepagents import create_deep_agent
+from langchain.agents.middleware import TodoListMiddleware
+from langchain_core.callbacks import BaseCallbackHandler
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
@@ -39,6 +41,7 @@ REVIEW a prompt the employee tried to send:
 Write the reason for the employee: one or two plain sentences, no jargon.
 
 ACT when asked to apply a workflow:
+0. First call write_todos once with your plan: three short steps, the first one in_progress.
 1. Call check_access for the workflow.
 2. If allowed, call create_project_artifact. The system pauses you there until the employee approves.
 3. Once it has run, call update_task_status for task t3 with status doing.
@@ -70,6 +73,8 @@ def build(model):
         tools=[*tools.REVIEW_TOOLS, *[t for t in tools.ACTION_TOOLS if t not in tools.REVIEW_TOOLS]],
         system_prompt=SYSTEM_PROMPT,
         subagents=[SCOUT],
+        # Planning: gives the agent a write_todos tool for its own to-do list.
+        middleware=[TodoListMiddleware()],
         # The harness itself stops before anything is created and waits for a person.
         interrupt_on={"create_project_artifact": {"allowed_decisions": ["approve", "reject"]}},
         checkpointer=MemorySaver(),  # holds a paused run until the employee answers
@@ -107,8 +112,27 @@ def spend_run() -> None:
     db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, str(used + 1)))
 
 
+class PlanWatcher(BaseCallbackHandler):
+    """Passes the agent's own to-do list (the harness's write_todos tool) on to the interface."""
+
+    def on_tool_start(self, serialized, input_str, *, inputs=None, **kwargs):
+        if (serialized or {}).get("name") != "write_todos":
+            return
+        todos = (inputs or {}).get("todos")
+        if todos is None:
+            try:
+                import ast
+
+                todos = ast.literal_eval(input_str).get("todos")
+            except Exception:
+                todos = None
+        if isinstance(todos, list):
+            tools.report_plan(todos)
+
+
 def _config(thread: str | None) -> dict:
-    return {"recursion_limit": 40, "configurable": {"thread_id": thread or uuid.uuid4().hex}}
+    return {"recursion_limit": 40, "callbacks": [PlanWatcher()],
+            "configurable": {"thread_id": thread or uuid.uuid4().hex}}
 
 
 def _final_text(result) -> str:

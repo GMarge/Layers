@@ -66,6 +66,17 @@ def _traced(name: str, fn: Callable[[], tuple[object, str]]) -> object:
     return result
 
 
+def report_plan(todos: list) -> None:
+    """The agent wrote or updated its own to-do list. Show it to the employee as written."""
+    plan = [{"content": str(t.get("content", ""))[:140], "status": t.get("status", "pending")}
+            for t in todos if isinstance(t, dict)][:8]
+    if not plan:
+        return
+    db.audit("layers-agent", "plan", plan)
+    if _sink:
+        _sink({"type": "plan", "todos": plan})
+
+
 def _workflow_row(workflow_id: str) -> dict | None:
     rows = db.query("SELECT * FROM workflows WHERE id = ? OR name = ?", (workflow_id, workflow_id))
     return rows[0] if rows else None

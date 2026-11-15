@@ -111,8 +111,15 @@ export interface AskAnswer {
   requested?: { id: string; approver: string };
 }
 
+/** One line of the agent's own to-do list. */
+export interface Todo {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
 export type AgentEvent =
   | { type: 'step'; step: Step }
+  | { type: 'plan'; todos: Todo[] }
   | { type: 'result'; summary: string; detail: string; artifact: Artifact; taskId: string };
 
 /** The contract between the UI and the Layers backend. */
@@ -155,11 +162,12 @@ export type Scene =
   | { name: 'pending'; prompt: string; rule: Rule; requestId: string; approver: string; why?: string }
   | { name: 'decided'; approved: boolean; approver: string }
   | { name: 'reuse'; prompt: string; item: KnowledgeItem; reason: string; showPreview: boolean }
-  | { name: 'working'; item: KnowledgeItem; steps: Step[] }
+  | { name: 'working'; item: KnowledgeItem; steps: Step[]; plan?: Todo[] }
   | {
       name: 'done';
       item: KnowledgeItem;
       steps: Step[];
+      plan?: Todo[];
       summary: string;
       detail: string;
       artifactId: string;

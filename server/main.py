@@ -9,6 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv()  # reads .env, which is never committed
 
+import os  # noqa: E402
+
+# Tracing switches on only when a LangSmith key has been provided.
+if os.environ.get("LANGSMITH_API_KEY", "").strip():
+    os.environ.setdefault("LANGSMITH_TRACING", "true")
+else:
+    os.environ["LANGSMITH_TRACING"] = "false"
+
 from fastapi import FastAPI, HTTPException  # noqa: E402
 from fastapi.responses import StreamingResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
@@ -119,7 +127,7 @@ def best_workflow(prompt: str) -> dict | None:
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, **agent.status()}
+    return {"ok": True, **agent.status(), "tracing": os.environ.get("LANGSMITH_TRACING") == "true"}
 
 
 @app.post("/api/reset")
@@ -151,7 +159,9 @@ def preflight(body: PromptIn):
             return {"type": "verdict", "verdict": {"kind": "pass"}}
 
         def note(event):  # each tool call shows up as a line of plain English
-            if event["type"] == "step" and event["step"]["status"] == "running":
+            if event["type"] == "plan":
+                emit({"type": "progress", "engaged": True, "note": "Planning the steps"})
+            elif event["type"] == "step" and event["step"]["status"] == "running":
                 emit({"type": "progress", "engaged": True, "note": event["step"]["label"]})
 
         scratch = tools.start_run(note)
@@ -193,7 +203,7 @@ def preflight(body: PromptIn):
 
                         def keep(event):
                             note(event)
-                            if event["type"] == "step" and event["step"]["status"] != "running":
+                            if event["type"] == "plan" or (event["type"] == "step" and event["step"]["status"] != "running"):
                                 steps.append(event)
 
                         tools.start_run(keep)

@@ -471,6 +471,10 @@ export default function App() {
       prompt,
       (e) => {
         if (token !== run.current) return;
+        if (e.type === 'plan') {
+          setScene((prev) => (prev.name === 'working' ? { ...prev, plan: e.todos } : prev));
+          return;
+        }
         if (e.type === 'step') {
           setScene((prev) => (prev.name === 'working' ? { ...prev, steps: upsert(prev.steps, e.step) } : prev));
           return;
@@ -488,6 +492,7 @@ export default function App() {
                 name: 'done',
                 item: prev.item,
                 steps: prev.steps,
+                plan: prev.plan,
                 summary: e.summary,
                 detail: e.detail,
                 artifactId: e.artifact.id,

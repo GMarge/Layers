@@ -3,7 +3,7 @@ import { ArrowUp, Check, Close } from '../ui/icons';
 import { manager, project, rules } from '../workspace/data';
 import type { EyeStyle, OutlineStyle } from '../lab/DesignLab';
 import { MascotGlyph, SHAPES, type Shape } from './Mascot';
-import type { Counters, KnowledgeItem, PolicyMode, RestMode, Scene, Signals, Step, UnsureMode } from './types';
+import type { Counters, KnowledgeItem, PolicyMode, RestMode, Scene, Signals, Step, Todo, UnsureMode } from './types';
 
 export type BubblePlacement = 'right' | 'above';
 
@@ -229,6 +229,23 @@ function AskForm({ onAsk, disabled }: { onAsk: (question: string) => void; disab
         <ArrowUp />
       </button>
     </form>
+  );
+}
+
+/** The to-do list the agent wrote for itself before starting, in its own words. */
+function Plan({ todos }: { todos?: Todo[] }) {
+  if (!todos || todos.length === 0) return null;
+  return (
+    <div className="b-plan">
+      <p className="b-fine">The agent's plan</p>
+      <ol>
+        {todos.map((t, i) => (
+          <li key={i} data-status={t.status}>
+            {t.content}
+          </li>
+        ))}
+      </ol>
+    </div>
   );
 }
 
@@ -645,6 +662,7 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
             <h2 className="b-title">
               Applying {scene.item.name} to {project.name}
             </h2>
+            <Plan todos={scene.plan} />
             <Steps steps={scene.steps} />
           </div>
         ),
@@ -680,6 +698,7 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
             <div className="b-main">
               <h2 className="b-title">{scene.summary}</h2>
               <p className="b-text">{scene.detail}</p>
+              <Plan todos={scene.plan} />
               <Steps steps={scene.steps} />
             </div>
             <div className="b-actions">

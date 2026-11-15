@@ -1,0 +1,35 @@
+/* The agent's own plan, shown above the tool calls it then made. */
+
+.b-plan {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--canvas);
+}
+
+.b-plan ol {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.b-plan li::marker {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.b-plan li[data-status='completed'] {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--line-strong);
+}
+
+.b-plan li[data-status='in_progress'] {
+  font-weight: 600;
+  color: var(--ink);
+}

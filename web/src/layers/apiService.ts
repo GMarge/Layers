@@ -63,7 +63,7 @@ const service: LayersService = {
       'apply',
       { workflow_id: itemId, prompt },
       (e) => {
-        if (e.type === 'step' || e.type === 'result') onEvent(e as unknown as AgentEvent);
+        if (e.type === 'step' || e.type === 'result' || e.type === 'plan') onEvent(e as unknown as AgentEvent);
         else if (e.type === 'error') throw new Error(String(e.message));
       },
       signal,
