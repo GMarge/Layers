@@ -8,7 +8,7 @@ Built at HackPrinceton, November 13 to 15, 2026. Track: Business and Enterprise.
 
 Clips, recorded from the running app with the live agent: [how it works](docs/clips/1-how-it-works.gif), [a prompt held, with the reason](docs/clips/2-held-with-the-reason.gif), [the agent applying a team workflow](docs/clips/3-agent-applies-a-team-workflow.gif), [a real answer, then a follow-up](docs/clips/4-a-real-answer-then-a-follow-up.gif), [a direction getting its own chat](docs/clips/5-a-direction-gets-its-own-chat.gif), [the manager approving a request](docs/clips/6-the-manager-approves.gif), [the agent drafting a status update](docs/clips/7-the-agent-drafts-a-status-update.gif), [a question already asked](docs/clips/8-you-asked-this-before.gif).
 
-More pictures, all taken from a real session with the live agent, are in [docs/shots](docs/shots). The submission text and pitch are in [docs/DEVPOST.md](docs/DEVPOST.md).
+More pictures, all taken from a real session with the live agent, are in [docs/shots](docs/shots).
 
 ## What it does
 

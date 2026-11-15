@@ -26,22 +26,6 @@ cd ~/layers && .venv/bin/python -m tests.test_agent_wiring
 cd ~/layers && sqlite3 layers.db "delete from settings where key like 'runs:%'"
 ```
 
-## Before a demo
-
-The free key allows **15 model requests a minute and 500 a day** for the main model (Gemini 3.5 Flash Lite). The day resets at midnight Pacific, which is 3 AM Eastern. One prompt costs between 0 and 6 requests.
-
-- A second free model (Gemini 3.1 Flash Lite) has its own 15 a minute and 500 a day. Layers switches to it by itself when the first is throttled or used up. The sidebar still says the live agent is on.
-- Clear cases cost nothing: an off-project hold and a team-workflow match are decided in code, with no model call.
-- Practise the clicks in the preview (stop the server, or use the Vercel link), where nothing is spent. Then do one or two full run-throughs with the live agent.
-- See what is left at aistudio.google.com/rate-limit, under "Rate limits by model".
-- If the page ever says "scripted preview", the server is not answering. Start it, and the page switches to the live agent by itself within a few seconds.
-
-## At the table
-
-1. Run `~/layers/scripts/demo.sh`. It starts whatever is not already running, says whether the live agent is on, and opens `http://localhost:5173/#intro`. That is the **How it works** screen: leave it up between demos. It loops through six example prompts by itself.
-2. Click **Start the live demo**, or press Enter. The dark bar pops in at the top: use **Try it** there for one-click examples. On a copy with no server, such as the Vercel link, the button reads "Try the live demo" and the workspace it opens says its answers are placeholders.
-3. Click **Refresh** in the top bar before the next person. **Try it**, then **How it works**, goes back to the first screen.
-
 ## By hand
 
 ### The gate

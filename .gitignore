@@ -19,3 +19,7 @@ __pycache__/
 
 # Vercel CLI link
 .vercel
+
+# Personal demo notes: kept on this laptop, not in the repo
+docs/CHEATSHEET.md
+docs/DEVPOST.md
