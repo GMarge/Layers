@@ -45,7 +45,7 @@ const TAP_SLOP = 9;
 
 const SINK_MS = 800;
 /** Height of the eyes, in the mascot's 64px box, while they sit on the chat box. */
-const NIB_EYE_Y = 67.5;
+const NIB_EYE_Y = 70.5;
 
 /** Small still version of a silhouette, for pickers. */
 export function MascotGlyph({ shape }: { shape: Shape }) {

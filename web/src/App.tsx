@@ -166,9 +166,8 @@ export default function App() {
     changeTree(next);
     if (branched) {
       const label = topicLabel(branched.topic);
-      if (branchModeRef.current === 'auto') {
-        setTimeout(() => notify(`New direction: ${label}. Layers put it on its own branch.`), 300);
-      } else {
+      // Quiet mode: the map shows the new branch and nothing interrupts the employee.
+      if (branchModeRef.current !== 'auto') {
         setTimeout(() => {
           if (sceneRef.current.name === 'ambient') setScene({ name: 'branch', lineId: branched.id, label });
         }, 700);

@@ -36,7 +36,7 @@ export const defaultLab: LabSettings = {
   open: true,
   policyMode: 'approval',
   unsureMode: 'ask',
-  branchMode: 'ask',
+  branchMode: 'auto',
   placement: 'right',
   shape: 'drop',
   eyes: 'oval',

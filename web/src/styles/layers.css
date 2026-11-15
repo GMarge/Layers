@@ -1269,11 +1269,11 @@ li[data-status='done'] .steps__mark {
 .goo__pool::before {
   content: '';
   position: absolute;
-  left: -16px;
-  right: -16px;
+  left: -8px;
+  right: -8px;
   bottom: 0;
-  height: 7px;
-  border-radius: 4px;
+  height: 5px;
+  border-radius: 5px 5px 0 0;
   background: inherit;
 }
 
@@ -1333,7 +1333,7 @@ li[data-status='done'] .steps__mark {
 .nib-eyes {
   position: absolute;
   left: 0;
-  top: 63px;
+  top: 66px;
   display: flex;
   justify-content: center;
   gap: 7px;
