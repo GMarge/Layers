@@ -24,6 +24,8 @@ interface Props {
   /** Room Layers needs above the chat box. The thread leaves it free. */
   reserve: number;
   sidebarSlot?: ReactNode;
+  /** The conversation map, shown under the top bar. */
+  railSlot?: ReactNode;
   onDraftChange(text: string): void;
   onSend(): void;
   onReview(): void;
@@ -202,7 +204,12 @@ function Rich({ text }: { text: string }) {
 }
 
 function MessageRow({ message: m }: { message: Message }) {
-  if (m.role === 'user') return <div className="msg msg--user">{m.text}</div>;
+  if (m.role === 'user')
+    return (
+      <div className="msg msg--user" data-seq={m.seq ?? 0}>
+        {m.text}
+      </div>
+    );
 
   if (m.role === 'layers') {
     return (
@@ -299,6 +306,7 @@ export function Workspace(p: Props) {
           <h1>{conversations[0]}</h1>
           <ProjectChip tasks={p.tasks} />
         </header>
+        {p.railSlot}
 
         <div className="thread" ref={threadRef}>
           <div className="thread__col">

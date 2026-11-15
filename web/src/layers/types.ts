@@ -68,6 +68,9 @@ export interface Message {
   artifact?: Artifact;
   /** Stand-in reply shown while no model is connected. */
   placeholder?: boolean;
+  /** Which branch of the conversation this belongs to, and its position in it. */
+  line?: string;
+  seq?: number;
 }
 
 /** Why the prompt in the composer has not been sent. */
@@ -129,7 +132,7 @@ export interface LayersService {
 
   // Only the real backend has these. The scripted stand-in leaves them out.
   /** The workspace model's answer to a prompt Layers has cleared. */
-  reply?(prompt: string): Promise<{ text: string; placeholder: boolean }>;
+  reply?(prompt: string, context?: { role: 'user' | 'assistant'; content: string }[]): Promise<{ text: string; placeholder: boolean }>;
   undo?(artifactId: string, taskId: string): Promise<void>;
   /** The manager's answer to an approval request. */
   decide?(requestId: string, approved: boolean): Promise<void>;
@@ -146,6 +149,7 @@ export type Scene =
   | { name: 'ask'; question: string; busy: boolean; answer: AskAnswer | null }
   | { name: 'checking'; engaged: boolean; note?: string }
   | { name: 'settings' }
+  | { name: 'branch'; lineId: string; label: string }
   | { name: 'policy'; prompt: string; rule: Rule; reason: string; signals: Signals; showRule: boolean }
   | { name: 'unsure'; prompt: string; rule: Rule; reason: string; signals: Signals }
   | { name: 'pending'; prompt: string; rule: Rule; requestId: string; approver: string; why?: string }

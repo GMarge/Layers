@@ -19,6 +19,8 @@ export interface LabSettings {
   open: boolean;
   policyMode: PolicyMode;
   unsureMode: UnsureMode;
+  /** When Layers notices a new direction: ask the employee, or branch quietly. */
+  branchMode: 'ask' | 'auto';
   placement: Placement;
   shape: Shape;
   eyes: EyeStyle;
@@ -34,6 +36,7 @@ export const defaultLab: LabSettings = {
   open: true,
   policyMode: 'approval',
   unsureMode: 'ask',
+  branchMode: 'ask',
   placement: 'right',
   shape: 'drop',
   eyes: 'oval',
@@ -234,6 +237,15 @@ export function DesignLab({ settings: s, floating, backend, awaitingManager, onC
               ['defer', 'Defer'],
             ]}
             onChange={(v) => set('unsureMode', v)}
+          />
+          <Seg
+            label="Branch"
+            value={s.branchMode}
+            options={[
+              ['ask', 'Tell me'],
+              ['auto', 'Quietly'],
+            ]}
+            onChange={(v) => set('branchMode', v)}
           />
           <Seg
             label="Motion"
