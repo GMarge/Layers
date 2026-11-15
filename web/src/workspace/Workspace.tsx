@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { Artifact, Hold, Message, Task } from '../layers/types';
+import type { Artifact, Hold, KnowledgeItem, Message, Task } from '../layers/types';
 import { ArrowUp, Check, Chevron } from '../ui/icons';
 import { company, conversations, employee, project, rules } from './data';
 
@@ -62,6 +62,8 @@ interface Props {
   status: string;
   /** Wipe the conversation and start the demo again. */
   onReset(): void;
+  /** Apply a team workflow that an answer pointed to. */
+  onUseItem(item: KnowledgeItem): void;
   onDraftChange(text: string): void;
   onSend(): void;
   onReview(): void;
@@ -254,7 +256,8 @@ const BranchIcon = () => (
   </svg>
 );
 
-function MessageRow({ message: m, agentName }: { message: Message; agentName: string }) {
+function MessageRow(props: { message: Message; agentName: string; onUse(item: KnowledgeItem): void }) {
+  const { message: m, agentName } = props;
   if (m.role === 'user')
     return (
       <div className="msg msg--user" data-seq={m.seq ?? 0}>
@@ -279,6 +282,47 @@ function MessageRow({ message: m, agentName }: { message: Message; agentName: st
     <div className="msg msg--ai">
       <p className="msg__who">{company.assistant}</p>
       {m.placeholder ? <p className="msg__text msg__text--quiet">{m.text}</p> : <Rich text={m.text ?? ''} />}
+      {m.knowledge && (
+        <div className="know">
+          <p className="msg__who">
+            <span className="msg__mark" aria-hidden="true" />
+            From your company's own work, found by {agentName}
+          </p>
+          {m.knowledge.processes.length > 0 && (
+            <ul className="b-procs">
+              {m.knowledge.processes.map((p) => (
+                <li key={`${p.who}-${p.project}`}>
+                  <p>
+                    <b>{p.who}</b> on {p.project}, {p.when}
+                  </p>
+                  <p className="know__did">{p.did}.</p>
+                  <p className="b-path">
+                    {p.path.map((step) => (
+                      <span key={step}>{step}</span>
+                    ))}
+                  </p>
+                  {p.workflow && (
+                    <p className="know__did">
+                      Used <code>{p.workflow}</code>
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          {m.knowledge.restricted && m.knowledge.restricted.length > 0 && (
+            <p className="know__did">
+              {m.knowledge.restricted.join(' and ')} {m.knowledge.restricted.length === 1 ? 'has' : 'have'} similar work
+              that is not shared with your team, so it is not shown. Your manager can ask for access.
+            </p>
+          )}
+          {m.knowledge.item && (
+            <button type="button" className="know__use" onClick={() => props.onUse(m.knowledge!.item!)}>
+              Use {m.knowledge.item.name} for {project.name}
+            </button>
+          )}
+        </div>
+      )}
       {m.list && (
         <ol className="msg__list">
           {m.list.map((item, n) => (
@@ -348,7 +392,7 @@ export function Workspace(p: Props) {
       rows.push(originRow());
       originShown = true;
     }
-    rows.push(<MessageRow key={m.id} message={m} agentName={p.agentName} />);
+    rows.push(<MessageRow key={m.id} message={m} agentName={p.agentName} onUse={p.onUseItem} />);
   }
   for (const mark of marks) rows.push(markRow(mark));
   if (!originShown) rows.push(originRow());

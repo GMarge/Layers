@@ -154,6 +154,14 @@ def run() -> None:
           said.get("found", {}).get("index") == 2 and [s["tool"] for s in said["steps"]] == ["get_branch_map", "read_branch"],
           said)
 
+    asked = "How did someone on the other team do something similar, and what did they use?"
+    check("a question about how others did it is treated as work", verdict(asked)["kind"] == "pass")
+    told = main.chat(main.ChatIn(prompt=asked))
+    check("the chat answers it from the company's records, with no model",
+          told["placeholder"] is False and "Ines Okafor" in told["text"] and told["knowledge"]["processes"], told)
+    check("another team's work is named as existing, and nothing more",
+          told["knowledge"]["restricted"] == ["Finance"] and "Dana" not in json.dumps(told) and "board deck" not in told["text"].lower(), told)
+
     # The agent's second job, on plain code here: an update that waits for the employee.
     draft = last(main.draft_update(), "draft")
     check("the status update is drafted from tasks, not from prompts",

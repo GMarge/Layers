@@ -9,6 +9,7 @@ import {
   chatsOf,
   dropStop,
   earnsChat,
+  findRepeat,
   fold,
   isVisible,
   lastLineIn,
@@ -29,7 +30,7 @@ import { AgentCluster } from './layers/AgentCluster';
 import type { BubbleActions, Prefs } from './layers/Bubble';
 import { EdgeGlow, type GlowMode } from './layers/EdgeGlow';
 import { connect, type BackendStatus } from './layers/apiService';
-import { createMockService } from './layers/mockService';
+import { createMockService, previewKnowledge } from './layers/mockService';
 import { Toast, type ToastState } from './layers/Toast';
 import type {
   AgentEvent,
@@ -113,6 +114,7 @@ function glowFor(scene: Scene): GlowMode {
     case 'ask':
       return 'checking';
     case 'branch':
+    case 'repeat':
       return 'knowledge';
     case 'unsure':
       return 'unsure';
@@ -145,6 +147,8 @@ function announce(scene: Scene, name: string): string {
           : `${name} asks whether ${scene.label} should be a chat of its own.`;
     case 'unsure':
       return `${name} is not sure this fits ${project.name}. Nothing was sent.`;
+    case 'repeat':
+      return `${name} found the same question earlier, in ${scene.where}. It was not sent again.`;
     case 'pending':
       return `Approval request ${scene.requestId} sent to ${scene.approver}.`;
     case 'decided':
@@ -424,12 +428,12 @@ export default function App({ active = true }: { active?: boolean }) {
       const reply = serviceRef.current.reply;
       void settled.current.then(() => reply(prompt, context)).then((r) => post({ role: 'ai', ...r }, line));
     } else {
+      // The preview has no model, but the company's records can still answer a question about them.
+      const known = previewKnowledge(prompt);
       post(
-        {
-          role: 'ai',
-          placeholder: true,
-          text: 'No model is connected in this preview build. Layers let this prompt through.',
-        },
+        known
+          ? { role: 'ai', ...known }
+          : { role: 'ai', placeholder: true, text: 'No model is connected in this preview build. Layers let this prompt through.' },
         line,
       );
     }
@@ -508,10 +512,28 @@ export default function App({ active = true }: { active?: boolean }) {
     });
   };
 
-  const send = async (text?: string) => {
+  const send = async (text?: string, again = false) => {
     const prompt = (text ?? draftRef.current).trim();
     const now = sceneRef.current.name;
     if (!prompt || now === 'checking' || now === 'working') return;
+
+    // The same question, already asked: it would get the same answer, so point back to it.
+    const earlier = again ? null : findRepeat(treeRef.current, prompt);
+    if (earlier) {
+      ++run.current;
+      const where = titleOf(earlier.node.line);
+      setHold({ kind: 'reuse', label: 'Not sent. You asked this before.' });
+      setScene({ name: 'repeat', prompt, nodeId: earlier.node.id, index: earlier.index, where, earlier: earlier.node.text });
+      logRun({
+        kind: 'review',
+        prompt,
+        by: backendRef.current ? 'code' : 'preview',
+        outcome: `Same question as prompt ${earlier.index + 1} in ${where}. Pointed back to it instead of asking again.`,
+        steps: [],
+        ms: 0,
+      });
+      return;
+    }
 
     const token = ++run.current;
     stash.current = null;
@@ -870,7 +892,7 @@ export default function App({ active = true }: { active?: boolean }) {
     const s = sceneRef.current;
     if (s.name === 'ambient' || s.name === 'working' || s.name === 'checking') return;
     // Remember what was on screen so tapping the agent can bring it back.
-    const unresolved = s.name === 'policy' || s.name === 'reuse' || s.name === 'pending' || s.name === 'unsure';
+    const unresolved = ['policy', 'reuse', 'pending', 'unsure', 'repeat'].includes(s.name);
     if (unresolved || s.name === 'done' || (s.name === 'ask' && s.answer)) stash.current = s;
     setScene({ name: 'ambient' });
     focusPrompt();
@@ -895,7 +917,7 @@ export default function App({ active = true }: { active?: boolean }) {
     setHold(null);
     stash.current = null;
     const now = sceneRef.current.name;
-    if (now === 'policy' || now === 'reuse' || now === 'decided' || now === 'unsure') setScene({ name: 'ambient' });
+    if (['policy', 'reuse', 'decided', 'unsure', 'repeat'].includes(now)) setScene({ name: 'ambient' });
   };
 
   /** Tapping the agent pulls it up so the employee can ask it something before sending. */
@@ -1104,6 +1126,23 @@ export default function App({ active = true }: { active?: boolean }) {
     sendDraft,
     sendWithNote,
     sendTrimmed,
+    goToRepeat: () => {
+      const s = sceneRef.current;
+      if (s.name !== 'repeat') return;
+      run.current++;
+      setDraft('');
+      setHold(null);
+      stash.current = null;
+      setScene({ name: 'ambient' });
+      openNode(s.nodeId);
+    },
+    askAgain: () => {
+      const s = sceneRef.current;
+      if (s.name !== 'repeat') return;
+      setHold(null);
+      setScene({ name: 'ambient' });
+      void send(s.prompt, true);
+    },
     goTo: (index) => {
       const node = treeRef.current.nodes[index];
       if (!node) return;
@@ -1310,6 +1349,7 @@ export default function App({ active = true }: { active?: boolean }) {
                 : 'Rules only: no model key is set.'
         }
         onReset={reset}
+        onUseItem={(item) => void runWorkflow(item, `Use ${item.name} for ${project.name}`)}
         onDraftChange={changeDraft}
         onSend={() => void send()}
         onReview={review}

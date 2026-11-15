@@ -6,7 +6,7 @@
 cd ~/layers && .venv/bin/python -m tests.smoke
 ```
 
-39 checks in a few seconds. It is free: it runs on a copy of the server with no model and its own empty database, so it never touches the running app or your model-run count. Run it after any change. If a line says `FAIL`, that is the thing that broke.
+42 checks in a few seconds. It is free: it runs on a copy of the server with no model and its own empty database, so it never touches the running app or your model-run count. Run it after any change. If a line says `FAIL`, that is the thing that broke.
 
 There is a second one for the agent's wiring (the pause before it creates or sends anything). It uses a scripted stand-in for the model, so it is free too:
 
@@ -55,6 +55,9 @@ The free key allows **15 model requests a minute and 500 a day** for the main mo
 | 8c | Send `Summarize Stocksmith pricing and plan my ski weekend` | Not sure, with "Part of this is project work" and the cut-down prompt. **Send only that part** sends it and sets your full draft aside. |
 | 8d | Send `Write a thank-you note to the team for last week` | Not sure, with a specific question from the agent, such as whether it is about Project X. |
 | 8e | Send `asdf` | Not sure. The agent asks what you meant. |
+
+| 8h | Send the opening question again: `Which five competitors should the Project X analysis cover? One line on each.` | "You asked this before." Nothing is sent. **Go to it** opens that place in the branch. **Ask again anyway** sends it. |
+| 8i | Send `How did someone on the other team do something similar, and what did they use?` | An answer naming teammates, their steps and the workflow they used, with the records underneath and a button to use that workflow. It also says Finance has similar work that is not shared with you. |
 
 ### The agent
 

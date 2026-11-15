@@ -93,7 +93,8 @@ const ASKS_EXISTING = /\b(built|already|existing|template|workflow|matrix|spread
 const PERSONAL = /\b(personal|travel|side project|my own|homework|weekend)\b/i;
 
 const ASKS_WHERE = /\b(where (did|is|was|were)|find|which (chat|branch)|did i (ask|already)|when did i|look for|locate)\b/i;
-const ASKS_TEAM = /\b(who else|teammates?|anyone else|how (did|have|has)|colleagues?|other people|someone else|others)\b/i;
+const ASKS_TEAM =
+  /\b(who else|teammates?|anyone else|has anyone|have others|other teams?|another team|colleagues?|someone (else|on|in)|on (my|the|our) team|how (did|have|has) \w+|what did \w+ use|(done|did) (this|that|something similar)|similar (work|project|thing)|other people|others)\b/i;
 const SKIP = new Set(['where', 'find', 'asked', 'about', 'talk', 'talked', 'chat', 'branch', 'which', 'when', 'have', 'that', 'this', 'with', 'what']);
 
 /** Find a prompt by following the branches: the branch that shares most words, then the prompt in it. */
@@ -111,6 +112,17 @@ function findIn(question: string, branches: BranchIndex[]): AskAnswer {
   return {
     text: `It is in ${best.branch.label}, prompt ${best.n + 1}.`,
     found: { line: best.branch.id, index: best.n, label: best.branch.label, prompt: best.text },
+  };
+}
+
+/** In the preview: the same answer the server gives to "how did someone else do this", from the sample records. */
+export function previewKnowledge(prompt: string) {
+  if (!ASKS_TEAM.test(prompt)) return null;
+  const processes = teamProcesses.slice(0, 3);
+  const lines = processes.map((p) => `- **${p.who}** on ${p.project}: ${p.did.toLowerCase()}. Steps: ${p.path.join(' → ')}. Used \`${p.workflow}\`.`);
+  return {
+    text: `Here is how people on your team did similar work.\n\n${lines.join('\n')}\n- Finance also has similar work, but it is not shared with your team. ${manager.first} can ask for access.`,
+    knowledge: { processes, item: competitorMatrix, restricted: ['Finance'] },
   };
 }
 

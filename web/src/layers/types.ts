@@ -35,6 +35,14 @@ export interface KnowledgeItem {
   usedBy?: { who: string; project: string }[];
 }
 
+/** The company's own records that bear on a question: who did similar work, and what they used. */
+export interface Knowledge {
+  processes: TeamProcess[];
+  item?: KnowledgeItem;
+  /** Teams that hold similar work this employee cannot see. Only their names. */
+  restricted?: string[];
+}
+
 /** How someone on the team did a piece of work: the steps they went through and what they used. */
 export interface TeamProcess {
   who: string;
@@ -81,6 +89,8 @@ export interface Message {
   artifact?: Artifact;
   /** Stand-in reply shown while no model is connected. */
   placeholder?: boolean;
+  /** What the company already knows that bears on the question. */
+  knowledge?: Knowledge;
   /** Which branch of the conversation this belongs to, and its position in it. */
   line?: string;
   seq?: number;
@@ -222,7 +232,10 @@ export interface LayersService {
 
   // Only the real backend has these. The scripted stand-in leaves them out.
   /** The workspace model's answer to a prompt Layers has cleared. */
-  reply?(prompt: string, context?: { role: 'user' | 'assistant'; content: string }[]): Promise<{ text: string; placeholder: boolean }>;
+  reply?(
+    prompt: string,
+    context?: { role: 'user' | 'assistant'; content: string }[],
+  ): Promise<{ text: string; placeholder: boolean; knowledge?: Knowledge }>;
   undo?(artifactId: string, taskId: string): Promise<void>;
   /** The manager's answer to an approval request. */
   decide?(requestId: string, approved: boolean): Promise<void>;
@@ -260,6 +273,8 @@ export type Scene =
     }
   | { name: 'policy'; prompt: string; rule: Rule; reason: string; signals: Signals; showRule: boolean }
   | { name: 'unsure'; prompt: string; rule: Rule; reason: string; signals: Signals; question?: string; trimmed?: string }
+  /** The same question was asked before: where it is, so the employee can go back to it. */
+  | { name: 'repeat'; prompt: string; nodeId: string; index: number; where: string; earlier: string }
   | { name: 'pending'; prompt: string; rule: Rule; requestId: string; approver: string; why?: string }
   | { name: 'decided'; approved: boolean; approver: string }
   | { name: 'reuse'; prompt: string; item: KnowledgeItem; reason: string; showPreview: boolean }

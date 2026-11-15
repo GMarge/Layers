@@ -45,6 +45,9 @@ export interface BubbleActions {
   sendTrimmed(): void;
   /** Open the chat a prompt is in and bring that prompt into view. */
   goTo(index: number): void;
+  /** The question was asked before: go to it, or ask it again anyway. */
+  goToRepeat(): void;
+  askAgain(): void;
   openSettings(): void;
   /** Fold a direction Layers split off back into the main line. */
   mergeBranch(lineId: string): void;
@@ -733,6 +736,39 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
               </dl>
             </div>
           </div>
+        ),
+      };
+
+    case 'repeat':
+      return {
+        takeFocus: true,
+        dismissible: true,
+        shortcuts: { g: a.goToRepeat, a: a.askAgain },
+        node: (
+          <>
+            <div className="b-main">
+              <h2 className="b-title">You asked this before.</h2>
+              <p className="b-text">
+                It is prompt {scene.index + 1}, in {scene.where}. The answer would be the same, so I did not send it
+                again.
+              </p>
+              <div className="b-item">
+                <p className="b-item__name">
+                  <span className="b-tag">{scene.where}</span>
+                  <span className="b-fine">prompt {scene.index + 1}</span>
+                </p>
+                <p className="b-text">{scene.earlier}</p>
+              </div>
+            </div>
+            <div className="b-actions">
+              <Act primary hint="G" onClick={a.goToRepeat}>
+                Go to it
+              </Act>
+              <Act hint="A" onClick={a.askAgain}>
+                Ask again anyway
+              </Act>
+            </div>
+          </>
         ),
       };
 

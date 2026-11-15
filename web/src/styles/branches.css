@@ -1114,6 +1114,62 @@ button.bmap__dot:hover::after,
   text-decoration: underline;
 }
 
+/* In an answer: what the company already knows about the question. Blue, because Layers found it. */
+
+.know {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--agent-tint);
+  border-radius: 14px;
+  animation: land 420ms var(--ease-out);
+}
+
+.know .msg__who {
+  color: var(--agent-ink);
+}
+
+.know .b-procs li {
+  background: var(--canvas);
+}
+
+.know__did {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.know__did code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--well);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.know__use {
+  justify-self: start;
+  height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--agent);
+  color: #fff;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.know__use:hover {
+  background: var(--agent-press);
+}
+
+.know__use:focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 2px;
+}
+
 /* Settings: the agent's name. */
 
 .b-name input {

@@ -1,4 +1,4 @@
-import type { AgentEvent, AskAnswer, CheckProgress, LayersService, Verdict } from './types';
+import type { AgentEvent, AskAnswer, CheckProgress, Knowledge, LayersService, Verdict } from './types';
 
 /**
  * The real Layers backend (FastAPI + DeepAgents), reached through the dev server's
@@ -79,7 +79,7 @@ const service: LayersService = {
 
   async reply(prompt, context) {
     try {
-      return await post<{ text: string; placeholder: boolean }>('chat', { prompt, context });
+      return await post<{ text: string; placeholder: boolean; knowledge?: Knowledge }>('chat', { prompt, context });
     } catch {
       return { text: 'Layers did not clear this prompt, so it was not sent to the workspace model.', placeholder: true };
     }

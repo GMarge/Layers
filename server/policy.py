@@ -19,6 +19,13 @@ REBUILD = re.compile(
     r"\b(build|create|make|generate|write|set up|automate)\b[\s\S]*"
     r"\b(spreadsheet|excel|sheet|matrix|table|template|workflow|automation|outline)\b", re.I)
 VAGUE = re.compile(r"\b(budget|offsite|email|schedule)\b", re.I)
+# A question about how people at the company have done similar work. The answer comes from
+# the company's own records, so it is work by definition.
+ASKS_TEAM = re.compile(
+    r"\b(who else|teammates?|anyone else|has anyone|have others|other teams?|another team|colleagues?|"
+    r"someone (else|on|in)|people on (my|the|our) team|on (my|the|our) team|how did \w+|how have \w+|"
+    r"what did (they|he|she|\w+) use|(done|did) (this|that|something similar)|similar (work|project|thing)|"
+    r"company('s)? (knowledge|playbook|process(es)?)|been done before)\b", re.I)
 
 
 def _hits(pattern: re.Pattern, text: str) -> list[str]:
@@ -52,6 +59,8 @@ def screen(prompt: str) -> dict:
     if against:
         return {"kind": "policy", "signals": {"fits": fits, "against": against},
                 "reason": f"Nothing in the prompt connects to the {db.PROJECT['title'].lower()}."}
+    if ASKS_TEAM.search(prompt):
+        return {"kind": "pass", "signals": {"fits": fits + _hits(ASKS_TEAM, prompt), "against": []}, "reason": ""}
     if fits and REBUILD.search(prompt):
         return {"kind": "reuse", "signals": {"fits": fits, "against": []},
                 "reason": "This asks to build something the team may already have."}

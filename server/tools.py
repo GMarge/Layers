@@ -113,6 +113,13 @@ def team_processes(workflow_id: str | None = None) -> list[dict]:
     return found
 
 
+def other_teams(query: str = "") -> list[str]:
+    """Teams that hold work the employee is not allowed to see. Only the team names leave here:
+    enough to say it exists and whom to ask, and nothing about what it is."""
+    teams = {row["team"] for row in db.query("SELECT team FROM processes") if row["team"] != db.EMPLOYEE["team"]}
+    return sorted(teams)
+
+
 def workflow_public(row: dict) -> dict:
     others = [p for p in team_processes(row["id"]) if p["who"] != db.EMPLOYEE["name"]]
     return {

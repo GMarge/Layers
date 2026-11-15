@@ -417,6 +417,47 @@ export function outlineOf(tree: Tree) {
   };
 }
 
+const FILLER = new Set(
+  'the a an of to for and or in on with is are be do does did what which how can could would should you me my our we i it its their this that these those please about from at by as so one each line them they'.split(' '),
+);
+/** A prompt that changes or continues the last answer. The same words can mean something new each time. */
+const MODIFIES = /^(make|shorten|shorter|longer|expand|rewrite|rephrase|reword|again|more|continue|go on|keep going|do the same|same for|try again|simplify|translate|fix|now|and|also|but|why|ok|okay|thanks|yes|no)\b/i;
+
+const words = (text: string) =>
+  new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length > 1 && !FILLER.has(w))
+      .map((w) => (w.length > 4 ? w.replace(/(ing|ed|es|s)$/, '') : w)),
+  );
+
+/**
+ * An earlier prompt that asks the same thing, if there is one. It would get the same answer,
+ * so Layers points back to it instead of asking again. A prompt that works on the last
+ * answer ("shorten this") is never a repeat.
+ */
+export function findRepeat(tree: Tree, text: string): { node: PromptNode; index: number } | null {
+  if (MODIFIES.test(text.trim())) return null;
+  const mine = words(text);
+  if (mine.size < 3) return null;
+  let best: { node: PromptNode; index: number } | null = null;
+  let top = 0;
+  tree.nodes.forEach((node, index) => {
+    const theirs = words(node.text);
+    if (theirs.size < 3) return;
+    let shared = 0;
+    for (const w of mine) if (theirs.has(w)) shared += 1;
+    const alike = shared / (mine.size + theirs.size - shared);
+    if (alike > top) {
+      top = alike;
+      best = { node, index };
+    }
+  });
+  return top >= 0.85 ? best : null;
+}
+
 /** How many prompts went to each direction, biggest first. */
 export function effort(tree: Tree): { topic: string | null; label: string; prompts: number }[] {
   const by = new Map<string, { topic: string | null; label: string; prompts: number }>();

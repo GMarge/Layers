@@ -29,6 +29,7 @@ const MOODS: Record<Scene['name'], Mood> = {
   ask: 'found',
   settings: 'found',
   branch: 'found',
+  repeat: 'found',
   unsure: 'checking',
   checking: 'checking',
   policy: 'alert',

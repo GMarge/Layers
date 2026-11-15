@@ -770,6 +770,41 @@ def feedback(body: FeedbackIn):
     return {"allowed": allowed, "learned": learned}
 
 
+def team_knowledge(prompt: str) -> dict | None:
+    """What the company already knows that bears on a prompt: how people did similar work and
+    what they used. Only for questions that ask about that, and only what this employee may see."""
+    if not policy.ASKS_TEAM.search(prompt):
+        return None
+    found = json.loads(tools.search_team_processes(prompt)) or tools.team_processes()[:3]
+    found = [p for p in found if p["who"] != db.EMPLOYEE["name"]][:3]
+    known: dict = {"processes": found, "restricted": tools.other_teams()}
+    used = tools._workflow_row(found[0]["workflow_id"]) if found and found[0]["workflow_id"] else None
+    if used and tools._can_use(used):
+        known["item"] = tools.workflow_public(used)
+    return known
+
+
+def knowledge_brief(known: dict) -> str:
+    """The same records as an instruction for the workspace model, so its answer stays on them."""
+    return ("\n\nThis question is about how people at the company have done similar work. Answer from these "
+            "records only. Name the person and the project, say what steps they took and what they used, and "
+            f"invent nobody.\nRecords: {json.dumps(known['processes'])}\n"
+            f"Teams with similar work that is not shared with this employee: {', '.join(known['restricted']) or 'none'}. "
+            "Say only that it exists and that their manager can ask for access.")
+
+
+def knowledge_answer(known: dict) -> str:
+    """The answer in plain words from the records alone, for when no model can be asked."""
+    if not known["processes"]:
+        return "Nobody on your team has done work like that through Layers yet."
+    lines = [f"**{p['who']}** on {p['project']}: {p['did'].lower()}. Steps: {' → '.join(p['path'])}."
+             + (f" Used `{p['workflow']}`." if p["workflow"] else "") for p in known["processes"]]
+    if known["restricted"]:
+        lines.append(f"{' and '.join(known['restricted'])} also has similar work, but it is not shared with your "
+                     f"team. {db.MANAGER.split()[0]} can ask for access.")
+    return "Here is how people on your team did similar work.\n\n" + "\n".join(f"- {line}" for line in lines)
+
+
 @app.post("/api/chat")
 def chat(body: ChatIn):
     """The workspace model. A prompt only gets here with an allowing decision on record."""
@@ -777,7 +812,12 @@ def chat(body: ChatIn):
     if not policy.may_send(prompt):
         db.audit("gate", "blocked_send", prompt[:200])
         raise HTTPException(403, "Layers has not cleared this prompt.")
+    # Questions about how others did similar work are answered from the company's own records.
+    known = team_knowledge(prompt)
+    extra = {"knowledge": known} if known else {}
     if not agent.MODEL:
+        if known:
+            return {"text": knowledge_answer(known), "placeholder": False, **extra}
         return {"text": "Layers cleared this prompt. No workspace model is connected yet, so there is no answer to show.",
                 "placeholder": True}
     try:
@@ -788,17 +828,22 @@ def chat(body: ChatIn):
         if agent.FALLBACK:  # the second free model answers if the first is throttled or used up
             model = model.with_fallbacks([agent.chat_model(agent.FALLBACK)])
         reply = model.invoke(
-            [{"role": "system", "content": WORKSPACE_PROMPT}, *seen, {"role": "user", "content": prompt}])
+            [{"role": "system", "content": WORKSPACE_PROMPT + (knowledge_brief(known) if known else "")},
+             *seen, {"role": "user", "content": prompt}])
         text = reply.content
         if isinstance(text, list):  # some providers answer in content blocks
             text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
         CHAT.append({"role": "assistant", "content": text})
-        return {"text": text, "placeholder": False}
+        return {"text": text, "placeholder": False, **extra}
     except agent.CapReached:
+        if known:  # the records answer it without a model
+            return {"text": knowledge_answer(known), "placeholder": False, **extra}
         return {"text": f"Layers cleared this prompt. Today's {agent.DAILY_RUN_CAP} model runs are used up, so the "
                         "workspace model was not asked.", "placeholder": True}
     except Exception as exc:
         db.audit("server", "chat_failed", str(exc))
+        if known:
+            return {"text": knowledge_answer(known), "placeholder": False, **extra}
         return {"text": "Layers cleared this prompt, but the workspace model did not answer.", "placeholder": True}
 
 
