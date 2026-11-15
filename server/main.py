@@ -323,6 +323,7 @@ def chat(body: PromptIn):
     try:
         from langchain.chat_models import init_chat_model
 
+        agent.spend_run()
         reply = init_chat_model(agent.MODEL).invoke(prompt)
         text = reply.content if isinstance(reply.content, str) else str(reply.content)
         return {"text": text, "placeholder": False}

@@ -78,11 +78,16 @@ def setting(key: str) -> str:
 def reset() -> None:
     """Wipe and reseed, so every demo starts from the same place."""
     with _lock:
+        try:  # today's model-use count must survive a demo reset
+            kept = _conn.execute("SELECT key, value FROM settings WHERE key LIKE 'runs:%'").fetchall()
+        except sqlite3.OperationalError:
+            kept = []
         for table in TABLES:
             _conn.execute(f"DROP TABLE IF EXISTS {table}")
         _conn.executescript(SCHEMA)
         _conn.executemany("INSERT INTO settings VALUES (?, ?)",
                           [("policy_mode", "approval"), ("unsure_mode", "ask")])
+        _conn.executemany("INSERT INTO settings VALUES (?, ?)", [tuple(r) for r in kept])
         _conn.executemany("INSERT INTO tasks VALUES (?, ?, ?)", [
             ("t1", "Research five competitors", "done"),
             ("t2", "Analyze findings", "doing"),
