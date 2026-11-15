@@ -110,6 +110,12 @@ export function DesignLab({ settings: s, floating, backend, awaitingManager, onC
                   : 'Live server, rules only. No model key is set yet.'}
           </p>
 
+          {backend && (
+            <a className="lab__link" href="#manager" target="_blank" rel="noreferrer">
+              Open the manager's view
+            </a>
+          )}
+
           <div className="lab__scenes">
             {SCENES.map(([scene, text]) => (
               <button key={scene} type="button" onClick={() => onScene(scene)}>

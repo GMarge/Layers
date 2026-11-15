@@ -7,9 +7,11 @@ import './styles/workspace.css';
 import './styles/layers.css';
 import './styles/lab.css';
 import App from './App';
+import { ManagerView } from './manager/ManagerView';
+import './styles/manager.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {window.location.hash === '#manager' ? <ManagerView /> : <App />}
   </StrictMode>,
 );
