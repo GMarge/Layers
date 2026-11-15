@@ -192,7 +192,7 @@ export interface LayersService {
   /** Tell the server what the company has chosen. The server enforces it. */
   sync?(settings: { policyMode: PolicyMode; unsureMode: UnsureMode }): Promise<void>;
   /** What the company has chosen, as the server has it. The manager can change it. */
-  settings?(): Promise<{ policyMode: PolicyMode; unsureMode: UnsureMode }>;
+  settings?(): Promise<{ policyMode: PolicyMode; unsureMode: UnsureMode; runs?: { used: number; cap: number } }>;
   reset?(): Promise<void>;
   /** Where an approval request stands, so the employee's side updates when the manager answers. */
   approvalStatus?(requestId: string): Promise<'pending' | 'approved' | 'declined'>;

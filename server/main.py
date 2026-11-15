@@ -228,8 +228,9 @@ def company_settings() -> dict:
 
 @app.get("/api/settings")
 def read_settings():
-    """What the company has chosen. Every workspace reads this and follows it."""
-    return company_settings()
+    """What the company has chosen. Every workspace reads this and follows it. It also says
+    how many of today's model runs are used, so the workspace can say so before they run out."""
+    return {**company_settings(), "runs": agent.usage()}
 
 
 @app.post("/api/settings")
@@ -281,13 +282,14 @@ def preflight(body: PreflightIn):
                 kind = "unsure"
             decided_by = "gate"
             judged, hint = False, None
+            looked = False  # whether the agent read the prompt, whoever ended up deciding
 
             def verdict(found: dict) -> dict:
                 # When the agent read the prompt it also said what it is about. That costs no
                 # extra model run, and it is what lets the branches follow meaning, not keywords.
                 if judged:
                     found["topic"] = hint
-                found["by"] = "agent" if decided_by == "agent" else "gate"
+                found["by"] = "agent" if looked else "gate"
                 return {"type": "verdict", "verdict": found}
 
             supervisor = agent.get()
@@ -301,8 +303,15 @@ def preflight(body: PreflightIn):
                     scratch = tools._scratch
                     said = scratch.get("verdict")
                     judged, hint = topic_of(said, current)
+                    looked = bool(said)
+                    if said and screen["kind"] == "unsure":
+                        # The rules themselves could not tell. That is the company's call (ask the
+                        # employee, send and log, or send to a person), so the agent may not settle
+                        # it either way. Its reading is added to the explanation instead.
+                        if said["reason"]:
+                            reason = f"{reason} The agent's reading: {said['reason']}"
                     # The model may explain and refine, but it cannot clear what the rules flagged.
-                    if said and not (screen["kind"] == "policy" and said["kind"] in ("pass", "reuse")):
+                    elif said and not (screen["kind"] == "policy" and said["kind"] in ("pass", "reuse")):
                         kind, reason, decided_by = said["kind"], said["reason"] or reason, "agent"
                         workflow = said.get("workflow_id") or None
                 except Exception as exc:
@@ -646,6 +655,9 @@ def chat(body: ChatIn):
             text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
         CHAT.append({"role": "assistant", "content": text})
         return {"text": text, "placeholder": False}
+    except agent.CapReached:
+        return {"text": f"Layers cleared this prompt. Today's {agent.DAILY_RUN_CAP} model runs are used up, so the "
+                        "workspace model was not asked.", "placeholder": True}
     except Exception as exc:
         db.audit("server", "chat_failed", str(exc))
         return {"text": "Layers cleared this prompt, but the workspace model did not answer.", "placeholder": True}

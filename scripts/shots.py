@@ -111,28 +111,33 @@ async def session(ws) -> None:
                 await L.until(() => document.querySelector('.composer__hold')?.textContent.includes('Waiting'), 'the request');
                 location.hash = '#manager';
                 await L.until(() => document.querySelector('.mgr__req'), 'the manager page');""")
-    await shot("06-manager-needs-you", 1.5)
+    await shot("11-manager-needs-you", 1.5)
 
     await js("""await L.click('.mgr__acts', 'Decline'); await L.sleep(1200); location.hash = '';
                 await L.until(() => L.title().includes('declined'), 'the decline');
-                await L.click('.bubble', 'Back to Project X'); await L.sleep(600);""")
+                await L.click('.bubble', 'Back to Project X'); await L.sleep(900);""")
+
+    await js("""await L.send('Draft an email to Priya with my status update');
+                await L.until(() => L.title().includes('not sure'), 'the unsure question');""")
+    await shot("03-not-sure-asks-you")
+    await js("await L.click('.bubble', 'Back to Project X'); await L.sleep(900);")
 
     await js("""await L.send('Build me an Excel automation that compares our five competitors');
                 await L.until(() => L.title().includes('already built'), 'the team workflow');
                 await L.click('.bubble', 'Preview');""")
-    await shot("03-team-already-built-it")
+    await shot("04-team-already-built-it")
 
     await js("""await L.click('.bubble', 'Use it for Project X');
                 await L.until(() => document.querySelector('.bubble .b-chip__text'), 'the finished workflow');
                 await L.click('.bubble', 'What I did');""")
-    await shot("04-agent-plan-and-tool-calls")
+    await shot("05-agent-plan-and-tool-calls")
     await js("document.querySelector('.bubble__close')?.click(); await L.sleep(900);")
 
     await js("""let n = L.answers(); await L.send('Outline the presentation deck in five slides');
                 await L.until(() => L.answers() > n, 'the deck answer'); await L.sleep(600);
                 await L.send('What pricing gaps can we use against Stocksmith?');
                 await L.until(() => L.title().includes('keep coming back'), 'the move to its own chat');""")
-    await shot("05-moved-into-its-own-chat", 1.4)
+    await shot("06-moved-into-its-own-chat", 1.4)
     await js("await L.click('.bubble', 'Keep it'); await L.sleep(700);")
 
     await js("""document.querySelector('.topbar__branches').click();
@@ -158,13 +163,13 @@ async def session(ws) -> None:
     await js("""window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); await L.sleep(400);
                 location.hash = '#manager'; await L.until(() => document.querySelector('.mgr__updates'), 'the update on the manager page');
                 document.querySelector('.mgr').scrollTo(0, document.getElementById('team').offsetTop - 84);""")
-    await shot("11-manager-team-and-person", 1.5)
+    await shot("12-manager-team-and-person", 1.5)
     await js("""document.querySelector('.mgr__more').click(); await L.sleep(300);
                 document.querySelector('.mgr').scrollTo(0, document.getElementById('audit').offsetTop - 84);""")
-    await shot("12-audit-trail")
+    await shot("13-audit-trail")
 
     await js("location.hash = '#both'; await L.sleep(3500);")
-    await shot("13-side-by-side", 1.0)
+    await shot("14-side-by-side", 1.0)
 
 
 async def main() -> None:

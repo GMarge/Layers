@@ -117,15 +117,27 @@ def status() -> dict:
 DAILY_RUN_CAP = int(os.environ.get("LAYERS_DAILY_RUN_CAP", "60"))
 
 
-def spend_run() -> None:
-    """Count one model run against today's cap. Raises when the cap is reached."""
+class CapReached(RuntimeError):
+    """Today's model runs are used up. Layers carries on with its rules and no model."""
+
+
+def _runs_key() -> str:
     import datetime
 
-    key = f"runs:{datetime.date.today().isoformat()}"
-    used = int(db.setting(key) or 0)
+    return f"runs:{datetime.date.today().isoformat()}"
+
+
+def usage() -> dict:
+    """How many model runs have been used today, and the most that are allowed."""
+    return {"used": int(db.setting(_runs_key()) or 0), "cap": DAILY_RUN_CAP}
+
+
+def spend_run() -> None:
+    """Count one model run against today's cap. Raises when the cap is reached."""
+    used = usage()["used"]
     if used >= DAILY_RUN_CAP:
-        raise RuntimeError("Daily model cap reached. Layers is on rules only until tomorrow.")
-    db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, str(used + 1)))
+        raise CapReached("Daily model cap reached. Layers is on rules only until tomorrow.")
+    db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (_runs_key(), str(used + 1)))
 
 
 class PlanWatcher(BaseCallbackHandler):

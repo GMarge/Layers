@@ -4,6 +4,10 @@ An intelligent management layer for a company's AI workspace. AI does the work; 
 
 Built at HackPrinceton, November 13 to 15, 2026. Track: Business and Enterprise.
 
+![A prompt held, with the rule and the words that triggered it](docs/shots/02-held-with-the-reason.jpg)
+
+More pictures, all taken from a real session with the live agent, are in [docs/shots](docs/shots). The submission text and pitch are in [docs/DEVPOST.md](docs/DEVPOST.md).
+
 ## What it does
 
 An employee works in the company's AI chat. Layers checks each prompt when they press Send:
@@ -11,7 +15,7 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 - **On project:** it goes straight through, and Layers stays quiet.
 - **Off project:** it is held. Layers names the rule, shows the words that triggered it, and offers a way back or a request to the manager.
 - **Already built:** if the team has an approved workflow for the request, Layers offers it and, on a click, applies it to the project. Two are set up for this project: a competitor comparison sheet and a presentation outline. Each moves its own task along.
-- **Not sure:** Layers says so, shows what counted each way, and follows the company's choice: ask the employee, let it through and log it, or hand it to a person.
+- **Not sure:** Layers says so, shows what counted each way and the agent's own reading, and follows the company's choice: ask the employee, let it through and log it, or hand it to a person. When the rules themselves cannot tell, the agent cannot settle it either way.
 
 - **Branches:** when the conversation moves to a different part of the project, Layers gives that direction its own line without being asked (an implicit branch). When the employee keeps coming back to the same direction, Layers moves it into a chat of its own (an explicit branch), listed under the chat it came from, and says so with a one-key undo. One return is enough when that direction is a third of the chat or more; a small aside has to grow to three prompts or be returned to twice. Layers shows the numbers it went on. The employee can also start a chat from any earlier prompt, merge lines back one at a time or all at once, and put a chat back where it came from. Each chat only gives the model its own history plus what it shared before it split.
 - **The branch map:** right-click the agent, or use the Branches button, for a page that draws the conversation: one row per line, one dot per prompt, a number where the employee came back to a line, a zigzag for a long unbroken run, and a red dead end for a prompt that was stopped and never sent. A second tab, "Today so far", reads progress from the branches and the task list.

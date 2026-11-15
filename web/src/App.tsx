@@ -233,14 +233,18 @@ export default function App({ active = true }: { active?: boolean }) {
   const known = useRef<{ policyMode: PolicyMode; unsureMode: UnsureMode } | null>(null);
   /** Just after a change made here, an older answer from the server is not allowed to undo it. */
   const quietUntil = useRef(0);
+  /** How many of today's model runs are used, as the server counts them. */
+  const [usage, setUsage] = useState<{ used: number; cap: number } | null>(null);
   useEffect(() => {
     if (!active || !service.settings) return;
     const read = service.settings;
     let live = true;
     const pull = () =>
       void read()
-        .then((s) => {
-          if (!live || Date.now() < quietUntil.current) return;
+        .then(({ runs: spent, ...s }) => {
+          if (!live) return;
+          if (spent) setUsage((u) => (u && u.used === spent.used && u.cap === spent.cap ? u : spent));
+          if (Date.now() < quietUntil.current) return;
           const before = known.current;
           known.current = s;
           setLab((l) => (l.policyMode === s.policyMode && l.unsureMode === s.unsureMode ? l : { ...l, ...s }));
@@ -1211,7 +1215,9 @@ export default function App({ active = true }: { active?: boolean }) {
           !backend
             ? 'Preview without the Layers server. Checks and branches work; answers are placeholders.'
             : backend.agent
-              ? `Live agent on ${(backend.model ?? '').split(':').pop()}.`
+              ? usage && usage.used >= usage.cap
+                ? `Today's ${usage.cap} model runs are used up, so Layers is working on its rules alone.`
+                : `Live agent on ${(backend.model ?? '').split(':').pop()}.${usage ? ` ${usage.used} of ${usage.cap} model runs used today.` : ''}`
               : backend.model
                 ? 'Live server on rules only. The model did not load.'
                 : 'Live server on rules only. No model key is set.'

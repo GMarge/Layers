@@ -104,8 +104,9 @@ def run() -> None:
     said = main.feedback(main.FeedbackIn(kind="override", prompt="Plan a team dinner"))
     check("with 'warn', the employee can send it and it is logged", said["allowed"] is True, said)
     main.settings(main.SettingsIn(policy_mode="approval", unsure_mode="ask", actor="manager"))
+    read = main.read_settings()
     check("the manager's rule change is what every workspace reads",
-          main.read_settings() == {"policy_mode": "approval", "unsure_mode": "ask"})
+          (read["policy_mode"], read["unsure_mode"]) == ("approval", "ask") and read["runs"]["used"] == 0, read)
 
     # Team workflows: found, permission-checked, applied, and undone.
     offer = verdict(SHEET)
