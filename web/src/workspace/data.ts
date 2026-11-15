@@ -79,6 +79,6 @@ export const seedMessages: Message[] = [
 export const examplePrompts = {
   offTopic: 'Plan my ski vacation this weekend',
   rebuild: 'Build me an Excel automation that compares our five competitors',
-  unsure: 'Compare ski resort pricing for the team offsite',
+  unsure: 'Draft an email to Priya with my status update',
   onTopic: 'Summarize how Stocksmith and Pantryline price their plans',
 };

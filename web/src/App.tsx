@@ -183,7 +183,8 @@ export default function App() {
     const line = track(prompt);
     // The model is told what this branch of the conversation has seen, and nothing else.
     const context = messagesRef.current
-      .filter((m) => m.role !== 'layers' && !m.placeholder && m.text && isVisible(treeRef.current, m))
+      // What Layers did counts as an answer, so the model does not try to redo it.
+      .filter((m) => !m.placeholder && m.text && isVisible(treeRef.current, m))
       .slice(-16)
       .map((m) => ({ role: m.role === 'user' ? ('user' as const) : ('assistant' as const), content: m.text ?? '' }));
     post({ role: 'user', text: prompt }, line);

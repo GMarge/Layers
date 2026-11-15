@@ -38,7 +38,8 @@ REVIEW a prompt the employee tried to send:
    - policy: it is clearly unrelated to the project, including general knowledge, homework or
      personal questions with no link to the brief.
    - unsure: you cannot tell. Say what points each way. Never guess.
-Write the reason for the employee: one or two plain sentences, no jargon.
+Write the reason in one or two plain sentences, no jargon. Describe the prompt itself and do not
+use "you" or "your", because the employee's manager may read it too.
 
 ACT when asked to apply a workflow:
 0. First call write_todos once with your plan: three short steps, the first one in_progress.
