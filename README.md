@@ -82,7 +82,9 @@ Check everything without a key or a model run:
 
 ### A public preview
 
-The `web` folder deploys to any static host as it is (on Vercel: set the root directory to `web`). With no server behind it the workspace says so and runs as a preview: the checks, branches and screens all work, a scripted stand-in plays the agent, and answers are placeholders. The live agent needs the server, which holds a database and paused agent runs, so it runs on a machine that stays up rather than on serverless functions.
+**https://layers-blue.vercel.app/#intro** is the `web` folder on Vercel, with no server behind it. The workspace says so and runs as a preview: the checks, branches and screens all work, a scripted stand-in plays the agent, and answers are placeholders. The live agent needs the server, which holds a database and paused agent runs, so it runs on a machine that stays up rather than on serverless functions.
+
+To put a new build there: `cd web && npx vercel deploy --prod --yes`.
 
 ## What is real and what is not
 
