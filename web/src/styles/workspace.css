@@ -774,3 +774,33 @@ li[data-status='done'] {
     max-width: 88%;
   }
 }
+
+/* Formatted model answers */
+
+.msg__md {
+  display: grid;
+  gap: 10px;
+}
+
+.msg__md b,
+.msg__md-head {
+  font-weight: 640;
+}
+
+.msg__md code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--well);
+  font-size: 0.82em;
+}
+
+.msg__md-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.msg__md-list li::marker {
+  color: var(--ink-3);
+}

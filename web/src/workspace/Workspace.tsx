@@ -144,6 +144,63 @@ function Sheet({ artifact }: { artifact: Artifact }) {
   );
 }
 
+/** Bold, code and emphasis inside one line of a model answer. Built as elements, never as HTML. */
+function inline(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\*[^*\s][^*]*\*)/g).map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**') && part.length > 4) return <b key={i}>{part.slice(2, -2)}</b>;
+    if (part.startsWith('`') && part.endsWith('`') && part.length > 2) return <code key={i}>{part.slice(1, -1)}</code>;
+    if (part.startsWith('*') && part.endsWith('*') && part.length > 2) return <em key={i}>{part.slice(1, -1)}</em>;
+    return part;
+  });
+}
+
+/** A model answer with its paragraphs, headings and lists laid out. */
+function Rich({ text }: { text: string }) {
+  const blocks: ReactNode[] = [];
+  let items: { ordered: boolean; rows: string[] } | null = null;
+  const flush = () => {
+    if (!items) return;
+    const List = items.ordered ? 'ol' : 'ul';
+    blocks.push(
+      <List key={blocks.length} className="msg__md-list">
+        {items.rows.map((row, i) => (
+          <li key={i}>{inline(row)}</li>
+        ))}
+      </List>,
+    );
+    items = null;
+  };
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    const bullet = /^([-*•]|\d+[.)])\s+(.*)$/.exec(line);
+    if (bullet) {
+      const ordered = /\d/.test(bullet[1]!);
+      if (!items || items.ordered !== ordered) {
+        flush();
+        items = { ordered, rows: [] };
+      }
+      items.rows.push(bullet[2]!);
+      continue;
+    }
+    flush();
+    if (!line) continue;
+    const heading = /^#{1,4}\s+(.*)$/.exec(line);
+    blocks.push(
+      heading ? (
+        <p key={blocks.length} className="msg__text msg__md-head">
+          {inline(heading[1]!)}
+        </p>
+      ) : (
+        <p key={blocks.length} className="msg__text">
+          {inline(line)}
+        </p>
+      ),
+    );
+  }
+  flush();
+  return <div className="msg__md">{blocks}</div>;
+}
+
 function MessageRow({ message: m }: { message: Message }) {
   if (m.role === 'user') return <div className="msg msg--user">{m.text}</div>;
 
@@ -163,7 +220,7 @@ function MessageRow({ message: m }: { message: Message }) {
   return (
     <div className="msg msg--ai">
       <p className="msg__who">{company.assistant}</p>
-      <p className={m.placeholder ? 'msg__text msg__text--quiet' : 'msg__text'}>{m.text}</p>
+      {m.placeholder ? <p className="msg__text msg__text--quiet">{m.text}</p> : <Rich text={m.text ?? ''} />}
       {m.list && (
         <ol className="msg__list">
           {m.list.map((item, n) => (
