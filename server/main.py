@@ -325,7 +325,9 @@ def chat(body: PromptIn):
 
         agent.spend_run()
         reply = init_chat_model(agent.MODEL).invoke(prompt)
-        text = reply.content if isinstance(reply.content, str) else str(reply.content)
+        text = reply.content
+        if isinstance(text, list):  # some providers answer in content blocks
+            text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
         return {"text": text, "placeholder": False}
     except Exception as exc:
         db.audit("server", "chat_failed", str(exc))
