@@ -216,17 +216,50 @@ export default function App({ active = true }: { active?: boolean }) {
   const mock = useMemo(() => createMockService(), []);
   const [service, setService] = useState(mock);
   const [backend, setBackend] = useState<BackendStatus | null>(null);
+  const serviceRef = useRef(service);
+  serviceRef.current = service;
+  const backendRef = useRef(backend);
+  backendRef.current = backend;
+
+  /**
+   * The service to use right now. If this page is still on the scripted preview, it looks for
+   * the server once more first, so a page that opened a moment too early is never stuck there.
+   */
+  const reach = async () => {
+    if (!backendRef.current) {
+      const found = await connect();
+      if (found) {
+        serviceRef.current = found.service;
+        backendRef.current = found.status;
+        setService(found.service);
+        setBackend(found.status);
+      }
+    }
+    return serviceRef.current;
+  };
+  const reachRef = useRef(reach);
+  reachRef.current = reach;
+
+  // Keep looking for the server until it answers, and say so when the live agent comes on.
   useEffect(() => {
-    let live = true;
-    void connect().then((found) => {
-      if (!live || !found) return;
-      setService(found.service);
-      setBackend(found.status);
-    });
-    return () => {
-      live = false;
+    let tries = 0;
+    const local = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const look = async () => {
+      if (backendRef.current) return;
+      tries += 1;
+      await reachRef.current();
+      if (!active) return;
+      if (backendRef.current && tries > 1) {
+        setToast({ id: Date.now(), text: 'Connected to the Layers server. The live agent is on.' });
+      } else if (!backendRef.current && tries === 2 && local) {
+        // On a machine that should have a server, a silent preview would be a nasty surprise.
+        setToast({ id: Date.now(), text: 'The Layers server is not answering, so this is the scripted preview. It switches by itself when the server is up.' });
+      }
     };
-  }, []);
+    void look();
+    const timer = setInterval(() => void look(), 2500);
+    return () => clearInterval(timer);
+  }, [active]);
 
   // The company's choices live on the server, which is what actually enforces them.
   // The manager can change them from their page, so this workspace reads them back and follows.
@@ -387,8 +420,8 @@ export default function App({ active = true }: { active?: boolean }) {
           .join('\n'),
       }));
     post({ role: 'user', text: prompt }, line);
-    if (service.reply) {
-      const reply = service.reply;
+    if (serviceRef.current.reply) {
+      const reply = serviceRef.current.reply;
       void settled.current.then(() => reply(prompt, context)).then((r) => post({ role: 'ai', ...r }, line));
     } else {
       post(
@@ -493,7 +526,7 @@ export default function App({ active = true }: { active?: boolean }) {
       }
     }, 14000);
     try {
-      verdict = await service.preflight(
+      verdict = await (await reach()).preflight(
         prompt,
         (p) => {
           if (p.step) seen = upsert(seen, p.step);
@@ -549,7 +582,7 @@ export default function App({ active = true }: { active?: boolean }) {
       prompts: t.nodes.map((node, n) => ({ node, n })).filter(({ node }) => node.line === line.id).map(({ node, n }) => ({ n, text: node.text.slice(0, 300) })),
     }));
     const began = performance.now();
-    const answer = await service.ask(q, index);
+    const answer = await (await reach()).ask(q, index);
     if (token !== run.current) return;
     if (answer.steps && answer.steps.length > 0) {
       logRun({

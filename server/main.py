@@ -342,7 +342,10 @@ def preflight(body: PreflightIn):
                 return {"type": "verdict", "verdict": found}
 
             supervisor = agent.get()
-            if supervisor:
+            # The agent is asked only when the rules leave something open. A clear hold, and a
+            # clear match with a team workflow, are settled in code: at once, with no model call,
+            # and with nothing a prompt could argue with.
+            if supervisor and screen["kind"] in ("review", "unsure"):
                 try:
                     recent = "\n".join(f"{m['role']}: {m['content'][:300]}" for m in CHAT[-4:])
                     agent.run(supervisor,
@@ -778,12 +781,13 @@ def chat(body: ChatIn):
         return {"text": "Layers cleared this prompt. No workspace model is connected yet, so there is no answer to show.",
                 "placeholder": True}
     try:
-        from langchain.chat_models import init_chat_model
-
         agent.spend_run()
         CHAT.append({"role": "user", "content": prompt})
         seen = [t.model_dump() for t in body.context] if body.context is not None else CHAT[-24:-1]
-        reply = init_chat_model(agent.MODEL).invoke(
+        model = agent.chat_model(agent.MODEL)
+        if agent.FALLBACK:  # the second free model answers if the first is throttled or used up
+            model = model.with_fallbacks([agent.chat_model(agent.FALLBACK)])
+        reply = model.invoke(
             [{"role": "system", "content": WORKSPACE_PROMPT}, *seen, {"role": "user", "content": prompt}])
         text = reply.content
         if isinstance(text, list):  # some providers answer in content blocks

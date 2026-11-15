@@ -9,7 +9,7 @@ import os
 import uuid
 
 from deepagents import create_deep_agent
-from langchain.agents.middleware import TodoListMiddleware
+from langchain.agents.middleware import ModelFallbackMiddleware, TodoListMiddleware
 from langchain_core.callbacks import BaseCallbackHandler
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
@@ -20,6 +20,23 @@ MODEL = os.environ.get("LAYERS_MODEL", "").strip()
 # Paid providers are refused unless this is switched on deliberately.
 if MODEL and not MODEL.startswith("google_genai:") and os.environ.get("LAYERS_ALLOW_PAID") != "yes":
     MODEL = ""
+
+# A second free model on the same key, with its own allowance. It answers when the first one
+# is throttled (a free tier allows only so many requests a minute) or has used up its day.
+FALLBACK = os.environ.get("LAYERS_FALLBACK_MODEL", "google_genai:gemini-3.1-flash-lite").strip()
+if FALLBACK and not FALLBACK.startswith("google_genai:") and os.environ.get("LAYERS_ALLOW_PAID") != "yes":
+    FALLBACK = ""
+if FALLBACK == MODEL:
+    FALLBACK = ""
+
+
+def chat_model(name: str):
+    """A chat model that gives up quickly. Left alone, a throttled request is retried for more
+    than a minute. Here it fails after one retry, so the second model can answer instead."""
+    from langchain.chat_models import init_chat_model
+
+    return init_chat_model(name, max_retries=1, timeout=45)
+
 
 SYSTEM_PROMPT = f"""You are Layers, the management layer on a company's AI workspace.
 
@@ -63,6 +80,7 @@ would settle it. Always give fits and against: the exact words from the prompt t
 
 ACT when asked to apply a workflow:
 0. First call write_todos once with your plan: three short steps, the first one in_progress.
+   Do not call write_todos again after that.
 1. Call check_access for the workflow.
 2. If allowed, call create_project_artifact. The system pauses you there until the employee approves.
 3. Once it has run, call update_task_status for the task the request names, with status doing.
@@ -101,15 +119,20 @@ _agent = None
 _error = ""
 
 
-def build(model):
-    """One create_deep_agent call. `model` is a provider:model string or a chat model object."""
+def build(model, fallback=None):
+    """One create_deep_agent call. `model` is a provider:model string or a chat model object.
+    `fallback` is the model that takes over when the first one fails."""
+    if isinstance(model, str):
+        fallback = fallback or (chat_model(FALLBACK) if FALLBACK else None)
+        model = chat_model(model)
     return create_deep_agent(
         model=model,
         tools=[*tools.REVIEW_TOOLS, *[t for t in tools.ACTION_TOOLS if t not in tools.REVIEW_TOOLS]],
         system_prompt=SYSTEM_PROMPT,
         subagents=[SCOUT],
         # Planning: gives the agent a write_todos tool for its own to-do list.
-        middleware=[TodoListMiddleware()],
+        # Fallback: if the model fails mid-run, the harness carries on with the second one.
+        middleware=[TodoListMiddleware(), *([ModelFallbackMiddleware(fallback)] if fallback else [])],
         # The harness itself stops before anything is created and waits for a person.
         interrupt_on={
             "create_project_artifact": {"allowed_decisions": ["approve", "reject"]},
@@ -133,7 +156,7 @@ def get():
 
 def status() -> dict:
     agent = get()
-    return {"agent": agent is not None, "model": MODEL or None, "error": _error or None}
+    return {"agent": agent is not None, "model": MODEL or None, "fallback": FALLBACK or None, "error": _error or None}
 
 
 # Safety cap so a free key is never pushed hard. Each run makes a handful of model calls.

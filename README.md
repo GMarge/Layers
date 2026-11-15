@@ -66,7 +66,7 @@ npm --prefix web run dev    # in a second terminal, then open http://localhost:5
 
 Without a model key the server runs on rules alone and the interface says so. Without the server the interface falls back to a scripted preview and says so.
 
-A free model tier slows down when prompts come back to back. Wait for each answer before the next prompt; when a check is slow the agent says "Still checking".
+A free model tier allows only so many requests a minute and a day. Layers keeps inside that in three ways: clear cases (an off-project hold, a team-workflow match) are decided in code with no model call, a second free model on the same key takes over when the first is throttled or used up (`LAYERS_FALLBACK_MODEL`), and a daily cap on model runs stops a runaway session. When a check is slow the agent says "Still checking".
 
 Check everything without a key or a model run:
 

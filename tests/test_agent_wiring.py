@@ -115,6 +115,23 @@ def main():
     assert sent and sent[0]["text"] == "Research is done. Analysis is next.", sent
     assert any(e["type"] == "plan" for e in events), "the plan should be reported"
     print("update ok: paused with the draft, sent the edited wording ->", sent[0]["text"])
+    # When the first model fails (throttled, or out of its daily allowance), the harness carries
+    # on with the second one and the employee never sees the difference.
+    class Down(Scripted):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            raise RuntimeError("429: quota exceeded")
+
+    spare = Scripted(script=[
+        call("get_project_context"),
+        call("submit_verdict", kind="pass", reason="Project work.", topic="same"),
+        AIMessage(content="Fine."),
+    ])
+    backed = agent.build(Down(), fallback=spare)
+    scratch = tools.start_run(events.append)
+    agent.run(backed, "REVIEW this prompt: Summarize the findings", "t-fallback")
+    tools.end_run()
+    assert scratch["verdict"]["kind"] == "pass", scratch
+    print("fallback ok: the first model failed and the second one finished the review")
     db.reset()
 
 
