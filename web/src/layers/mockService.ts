@@ -99,7 +99,7 @@ const SKIP = new Set(['where', 'find', 'asked', 'about', 'talk', 'talked', 'chat
 
 /** Find a prompt by following the branches: the branch that shares most words, then the prompt in it. */
 function findIn(question: string, branches: BranchIndex[]): AskAnswer {
-  const words = (question.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !SKIP.has(w)).map((w) => w.slice(0, 6));
+  const words = (question.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !SKIP.has(w)).map((w) => w.slice(0, 4));
   const score = (text: string) => words.filter((w) => text.toLowerCase().includes(w)).length;
   let best: { branch: BranchIndex; n: number; text: string; points: number } | null = null;
   for (const branch of branches) {

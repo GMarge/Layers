@@ -615,7 +615,7 @@ SKIP_WORDS = {"where", "find", "asked", "about", "talk", "talked", "chat", "bran
 def plain_find(question: str, branches: list[dict]) -> dict | None:
     """Find a prompt by following the branches, in plain code: pick the branch whose prompts share
     the most words with the question, then the prompt in it that shares the most."""
-    words = [w[:6] for w in re.findall(r"[a-z]{4,}", question.lower()) if w not in SKIP_WORDS]
+    words = [w[:4] for w in re.findall(r"[a-z]{4,}", question.lower()) if w not in SKIP_WORDS]
     if not words or not branches:
         return None
     tools.get_branch_map()

@@ -123,14 +123,17 @@ async def session(ws) -> None:
                 document.querySelector('.know').scrollIntoView({ block: 'center' });""")
     await shot("19-answers-from-company-records")
 
-    await js("""document.querySelector('.views__try').click(); await L.sleep(250);
-                await L.click('.views__menu', 'Ask Layers');
-                await L.ask('Where did I ask about pricing?');
-                await L.until(() => L.button('.bubble', 'Go to it'), 'the prompt it found');""")
-    await shot("15-finds-it-by-following-the-branches")
-    await js("""await L.ask('How have teammates done this?');
-                await L.until(() => document.querySelector('.b-procs'), 'how teammates did it');""")
-    await shot("16-how-teammates-did-it")
+    try:
+        await js("""document.querySelector('.views__try').click(); await L.sleep(250);
+                    await L.click('.views__menu', 'Ask Layers');
+                    await L.ask('Where did I ask about pricing?');
+                    await L.until(() => L.button('.bubble', 'Go to it'), 'the prompt it found', 60000);""")
+        await shot("15-finds-it-by-following-the-branches")
+        await js("""await L.ask('How have teammates done this?');
+                    await L.until(() => document.querySelector('.b-procs'), 'how teammates did it', 60000);""")
+        await shot("16-how-teammates-did-it")
+    except RuntimeError as problem:
+        print("skipped the Ask Layers pictures:", str(problem)[:90], flush=True)
     await js("document.querySelector('.bubble__close')?.click(); await L.sleep(900);")
 
     await js("""await L.send('Plan my ski vacation this weekend');
