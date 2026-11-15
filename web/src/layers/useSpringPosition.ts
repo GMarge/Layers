@@ -12,11 +12,8 @@ const CX = 19.5;
 const KY = 150;
 const CY = 22.5;
 
-/** Distance at which the agent counts as having reached its target. */
-const NEAR = 34;
-/** A retarget farther than this is a flight; anything shorter is an adjustment. */
-const FLIGHT = 120;
-
+/** The bubble may open only when the character has nearly finished moving. */
+const NEAR = 2;
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /**
@@ -63,7 +60,9 @@ export function useSpringPosition(ref: RefObject<HTMLElement | null>, target: Po
       return;
     }
 
-    if (Math.hypot(s.x - s.tx, s.y - s.ty) > FLIGHT) setArrived(false);
+    // A 34px early-arrival window made the bubble pop while the mascot was
+    // still moving, particularly after short repositions around the composer.
+    if (Math.hypot(s.x - s.tx, s.y - s.ty) > NEAR) setArrived(false);
     // Browsers pause animation frames in a background tab. Land anyway so the bubble still opens.
     clearTimeout(s.timer);
     s.timer = window.setTimeout(settle, 1400);
@@ -79,7 +78,7 @@ export function useSpringPosition(ref: RefObject<HTMLElement | null>, target: Po
       s.y += s.vy * dt;
 
       const dist = Math.hypot(s.x - s.tx, s.y - s.ty);
-      if (dist < NEAR) setArrived(true);
+      if (dist < NEAR && Math.hypot(s.vx, s.vy) < 25) setArrived(true);
       if (dist < 0.3 && Math.hypot(s.vx, s.vy) < 6) {
         settle();
         return;
