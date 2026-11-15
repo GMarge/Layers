@@ -88,7 +88,16 @@ export interface Counters {
 export type Verdict = (
   | { kind: 'pass' }
   | { kind: 'policy'; rule: Rule; reason: string; signals: Signals }
-  | { kind: 'unsure'; rule: Rule; reason: string; signals: Signals }
+  | {
+      kind: 'unsure';
+      rule: Rule;
+      reason: string;
+      signals: Signals;
+      /** The one question that would settle it, when the agent has one. */
+      question?: string;
+      /** For a mixed prompt: the project work alone, which could be sent by itself. */
+      trimmed?: string;
+    }
   | { kind: 'reuse'; item: KnowledgeItem; reason: string }
 ) & {
   /**
@@ -222,7 +231,7 @@ export type Scene =
       evidence?: string;
     }
   | { name: 'policy'; prompt: string; rule: Rule; reason: string; signals: Signals; showRule: boolean }
-  | { name: 'unsure'; prompt: string; rule: Rule; reason: string; signals: Signals }
+  | { name: 'unsure'; prompt: string; rule: Rule; reason: string; signals: Signals; question?: string; trimmed?: string }
   | { name: 'pending'; prompt: string; rule: Rule; requestId: string; approver: string; why?: string }
   | { name: 'decided'; approved: boolean; approver: string }
   | { name: 'reuse'; prompt: string; item: KnowledgeItem; reason: string; showPreview: boolean }

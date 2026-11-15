@@ -41,7 +41,7 @@ CHAT: list[dict] = list(SEED_CHAT)
 
 
 WORKSPACE_PROMPT = (
-    f"You are Fernhill AI, the company's work assistant. The employee is working on {db.PROJECT['name']} "
+    f"You are the work assistant at {db.COMPANY}. The employee is working on {db.PROJECT['name']} "
     f"({db.PROJECT['title']}). Answer clearly and briefly. Use short paragraphs, and simple lists where they "
     "help. Do not use LaTeX or tables."
 )
@@ -80,6 +80,30 @@ def task_for(workflow_id: str) -> str:
     """The project task a workflow moves along when it is applied."""
     row = tools._workflow_row(workflow_id)
     return tools.plan_of(row)["task"] if row else "t3"
+
+
+def said_phrases(text: object, prompt: str) -> list[str]:
+    """The words the agent says counted, kept only if they really are in the prompt."""
+    low = prompt.lower()
+    found = []
+    for part in re.split(r"[;\n]", str(text or "")):
+        phrase = " ".join(part.strip(" \"'.,").split())
+        if phrase and len(phrase) <= 48 and phrase.lower() in low and phrase.lower() not in (f.lower() for f in found):
+            found.append(phrase)
+    return found[:3]
+
+
+def said_part(text: object, prompt: str) -> str:
+    """The agent's cut-down prompt, kept only if it is a real part of what the employee wrote:
+    shorter than the prompt, and made almost entirely of the prompt's own words."""
+    part = " ".join(str(text or "").split()).strip(" \"'")
+    if not part or len(part) >= len(prompt.strip()):
+        return ""
+    theirs = set(re.findall(r"[a-z0-9']+", prompt.lower()))
+    words = re.findall(r"[a-z0-9']+", part.lower())
+    if len(words) < 2 or sum(w in theirs for w in words) < 0.8 * len(words):
+        return ""
+    return part[:400]
 
 
 def act_task(workflow_id: str) -> str:
@@ -283,6 +307,8 @@ def preflight(body: PreflightIn):
             decided_by = "gate"
             judged, hint = False, None
             looked = False  # whether the agent read the prompt, whoever ended up deciding
+            signals = screen["signals"]
+            question, trimmed = "", policy.project_part(prompt) if screen["kind"] == "unsure" else ""
 
             def verdict(found: dict) -> dict:
                 # When the agent read the prompt it also said what it is about. That costs no
@@ -304,6 +330,14 @@ def preflight(body: PreflightIn):
                     said = scratch.get("verdict")
                     judged, hint = topic_of(said, current)
                     looked = bool(said)
+                    if said:
+                        # What the agent adds to any decision: the words that counted, the question
+                        # that would settle it, and the project part of a mixed prompt.
+                        question = " ".join(str(said.get("question", "")).split())[:160]
+                        trimmed = said_part(said.get("project_part"), prompt) or trimmed
+                        if not signals["fits"] and not signals["against"]:
+                            signals = {"fits": said_phrases(said.get("fits"), prompt),
+                                       "against": said_phrases(said.get("against"), prompt)}
                     if said and screen["kind"] == "unsure":
                         # The rules themselves could not tell. That is the company's call (ask the
                         # employee, send and log, or send to a person), so the agent may not settle
@@ -353,8 +387,15 @@ def preflight(body: PreflightIn):
                 return verdict({"kind": "pass"})
 
             policy.record(prompt, kind, False, reason, decided_by)
-            return verdict({"kind": kind, "rule": rule("AI-01"), "reason": reason,
-                            "signals": screen["signals"]})
+            held = {"kind": kind, "rule": rule("AI-01"), "reason": reason, "signals": signals}
+            if kind == "unsure":
+                # Two ways out that the agent can offer: answer its question, or send only the
+                # project part. That part goes back through the gate like any other prompt.
+                if question:
+                    held["question"] = question
+                if trimmed and policy.screen(trimmed)["kind"] in ("pass", "reuse"):
+                    held["trimmed"] = trimmed
+            return verdict(held)
         finally:
             tools.end_run()
 
@@ -807,7 +848,7 @@ def manager():
         "reused": db.query("SELECT COUNT(*) AS n FROM artifacts")[0]["n"],
     }
     live = {
-        "id": "jordan", "name": db.EMPLOYEE["name"], "role": db.EMPLOYEE["role"],
+        "id": "me", "name": db.EMPLOYEE["name"], "role": db.EMPLOYEE["role"],
         "team": db.EMPLOYEE["team"], "sample": False, "project": db.PROJECT, "tasks": tasks,
         "counts": counts, "pending": len(pending), "feed": feed[:12],
         "branches": json.loads(db.setting("branches") or "null"),

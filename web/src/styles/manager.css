@@ -556,7 +556,8 @@
   position: fixed;
   top: 12px;
   left: 50%;
-  z-index: 80;
+  /* Above everything, in every view: it is how the demo is driven. */
+  z-index: 200;
   display: flex;
   padding: 3px;
   border-radius: 12px;
@@ -600,6 +601,32 @@
 .views__try:hover,
 .views__try[aria-expanded='true'] {
   background: #1f4fd6;
+}
+
+.views__refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 3px;
+  padding: 5px 10px 5px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: #c9c9d4;
+  font-size: 12.5px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.views__refresh:hover {
+  background: #2a2a33;
+  color: #ffffff;
+}
+
+.views__try:focus-visible,
+.views__refresh:focus-visible {
+  outline: 2px solid #f1f1f4;
+  outline-offset: 1px;
 }
 
 .views__menu {
@@ -659,14 +686,14 @@
   color: #a4a4b0;
 }
 
-.views[data-view='both'] .views__menu {
-  top: auto;
-  bottom: calc(100% + 8px);
-}
-
 @media (max-width: 560px) {
-  .views a[data-view='both'] {
+  .views a[data-view='both'],
+  .views__refresh span {
     display: none;
+  }
+
+  .views__refresh {
+    padding: 5px 8px;
   }
 
   .views__menu {
@@ -679,12 +706,14 @@
   outline-offset: 1px;
 }
 
+/* Side by side: a strip at the top keeps the bar clear of both pages. */
 .split {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 1px;
   height: 100dvh;
-  background: var(--line-strong);
+  padding-top: 54px;
+  background: linear-gradient(var(--canvas) 54px, var(--line-strong) 54px);
 }
 
 .split iframe {
@@ -694,9 +723,3 @@
   background: var(--surface);
 }
 
-/* In the split view the switcher sits at the bottom of the seam, clear of both pages. */
-.views[data-view='both'] {
-  top: auto;
-  bottom: 12px;
-  left: 60%;
-}

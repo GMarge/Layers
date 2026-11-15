@@ -196,16 +196,24 @@ def request_manager_approval(prompt: str, reason: str) -> str:
     return _traced("request_manager_approval", body)
 
 
-def submit_verdict(kind: str, reason: str, workflow_id: str = "", topic: str = "") -> str:
+def submit_verdict(kind: str, reason: str, workflow_id: str = "", topic: str = "", question: str = "",
+                   project_part: str = "", fits: str = "", against: str = "") -> str:
     """Give your finding on a prompt. kind is one of: pass, policy, unsure, reuse.
     reason is one or two plain sentences for the employee. For reuse, give the workflow_id.
     topic is the direction the prompt belongs to: one of the direction names given in the task,
-    written exactly, or two or three plain words naming a new direction."""
+    written exactly, or two or three plain words naming a new direction.
+    fits and against are the exact words or phrases from the prompt that count each way,
+    separated by semicolons, at most three each.
+    question: when kind is unsure, the one short question to the employee that would settle it.
+    project_part: when the prompt mixes project work with something else, the prompt rewritten
+    to keep only the project work, in the employee's own words."""
     def body():
         if kind not in ("pass", "policy", "unsure", "reuse"):
             raise ValueError("kind must be pass, policy, unsure or reuse")
         _scratch["verdict"] = {"kind": kind, "reason": reason.strip(), "workflow_id": workflow_id,
-                               "topic": str(topic).strip()}
+                               "topic": str(topic).strip(), "question": str(question).strip(),
+                               "project_part": str(project_part).strip(),
+                               "fits": str(fits), "against": str(against)}
         said = str(topic).strip()[:40]
         return "Recorded.", f"{kind}, direction: {said}" if said else kind
     return _traced("submit_verdict", body)

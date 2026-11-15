@@ -464,7 +464,15 @@ export default function App({ active = true }: { active?: boolean }) {
 
     // Unsure, and the employee gets to decide.
     setHold({ kind: 'policy', label: `Not sent yet. ${name} has a question.` });
-    setScene({ name: 'unsure', prompt, rule: verdict.rule, reason: verdict.reason, signals: verdict.signals });
+    setScene({
+      name: 'unsure',
+      prompt,
+      rule: verdict.rule,
+      reason: verdict.reason,
+      signals: verdict.signals,
+      question: verdict.question,
+      trimmed: verdict.trimmed,
+    });
   };
 
   const send = async (text?: string) => {
@@ -609,6 +617,18 @@ export default function App({ active = true }: { active?: boolean }) {
     setScene({ name: 'ambient' });
     notify('Sent. Your reason is logged with it.');
     focusPrompt();
+  };
+
+  /** Send only the project part of a mixed prompt. The whole draft is set aside, not thrown away. */
+  const sendTrimmed = () => {
+    const s = sceneRef.current;
+    if (s.name !== 'unsure' || !s.trimmed) return;
+    run.current++;
+    setSetAside(s.prompt);
+    setHold(null);
+    stash.current = null;
+    setDraft(s.trimmed);
+    void send(s.trimmed);
   };
 
   const sendAnyway = () => {
@@ -1023,6 +1043,7 @@ export default function App({ active = true }: { active?: boolean }) {
     useFromAsk,
     sendDraft,
     sendWithNote,
+    sendTrimmed,
     toggleHidden,
     openSettings: () => setScene({ name: 'settings' }),
     mergeBranch: (lineId) => {

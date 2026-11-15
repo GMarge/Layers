@@ -358,7 +358,7 @@ export function Workspace(p: Props) {
       <aside className="side">
         <p className="side__brand">
           <span className="side__glyph" aria-hidden="true">
-            F
+            C
           </span>
           {company.assistant}
         </p>

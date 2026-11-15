@@ -69,10 +69,40 @@ function TryMenu({ view }: { view: View }) {
     </>
   );
 
+  /** Start the whole demo over: chats, branches, requests, updates and rules, for every view. */
+  const refresh = async () => {
+    await fetch('/api/reset', { method: 'POST' }).catch(() => {});
+    try {
+      localStorage.removeItem('layers.session.v1');
+    } catch {
+      // Nothing was saved, so there is nothing to clear.
+    }
+    window.location.reload();
+  };
+
   return (
     <>
       <button type="button" className="views__try" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         Try it
+      </button>
+      <button
+        type="button"
+        className="views__refresh"
+        title="Refresh: start the demo over with a clean workspace"
+        aria-label="Refresh. Start the demo over with a clean workspace"
+        onClick={() => void refresh()}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+          <path
+            d="M11.6 7a4.6 4.6 0 1 1-1.4-3.3M11.8 1.6v2.6H9.2"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+        <span>Refresh</span>
       </button>
       {open && (
         <div className="views__menu" role="menu" aria-label="Examples to try">

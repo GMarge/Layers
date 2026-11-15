@@ -2,8 +2,8 @@ import type { KnowledgeItem, Message, Rule, Task } from '../layers/types';
 
 /** Everything in this file is fictional seed data for the demo workspace. */
 
-export const company = { name: 'Fernhill', assistant: 'Fernhill AI' };
-export const employee = { name: 'Jordan Lee', initials: 'JL', role: 'Intern, Strategy' };
+export const company = { name: 'The Company Company', assistant: 'The Company Company' };
+export const employee = { name: 'Gavin Margerum', initials: 'GM', role: 'Intern, Strategy' };
 export const manager = { name: 'Priya Nair', first: 'Priya' };
 
 export const project = {
@@ -31,7 +31,7 @@ export const seedTasks: Task[] = [
 export const assignedWorkRule: Rule = {
   id: 'AI-01',
   name: 'Assigned work only',
-  text: 'Use Fernhill AI for work on your assigned projects.',
+  text: 'Use the company AI for work on your assigned projects.',
   owner: manager.name,
   scope: 'Applies to this workspace only',
 };

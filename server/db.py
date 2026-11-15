@@ -10,7 +10,8 @@ DB_PATH = Path(__file__).resolve().parent.parent / "layers.db"
 
 # The server acts for one signed-in employee. Identity is fixed here, on the server,
 # and is never taken from the browser or from the model.
-EMPLOYEE = {"name": "Jordan Lee", "team": "Strategy", "role": "Intern"}
+EMPLOYEE = {"name": "Gavin Margerum", "team": "Strategy", "role": "Intern"}
+COMPANY = "The Company Company"
 MANAGER = "Priya Nair"
 PROJECT = {"name": "Project X", "title": "Competitor analysis", "due": "Fri, Nov 20"}
 
@@ -97,7 +98,7 @@ def reset() -> None:
             ("t4", "Draft presentation", "todo"),
         ])
         _conn.executemany("INSERT INTO rules VALUES (?, ?, ?, ?, ?)", [
-            ("AI-01", "Assigned work only", "Use Fernhill AI for work on your assigned projects.",
+            ("AI-01", "Assigned work only", "Use the company AI for work on your assigned projects.",
              MANAGER, "Applies to this workspace only"),
             ("AI-02", "Reuse before rebuild",
              "Check for an approved team workflow before generating a new one.",

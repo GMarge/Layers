@@ -104,7 +104,7 @@ export function ManagerView() {
   const [data, setData] = useState<ManagerData | null>(null);
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [chosen, setChosen] = useState('jordan');
+  const [chosen, setChosen] = useState('me');
   const [showAudit, setShowAudit] = useState(false);
   /** A rule the manager just changed, shown at once while the server catches up. */
   const [draft, setDraft] = useState<Settings | null>(null);

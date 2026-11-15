@@ -41,6 +41,8 @@ export interface BubbleActions {
   sendDraft(): void;
   /** Send a prompt Layers was unsure about, with the employee's reason attached. */
   sendWithNote(note: string): void;
+  /** Send only the project part of a mixed prompt, and set the whole draft aside. */
+  sendTrimmed(): void;
   openSettings(): void;
   /** Fold a direction Layers split off back into the main line. */
   mergeBranch(lineId: string): void;
@@ -139,7 +141,7 @@ function Choice<T extends string>(props: {
 }
 
 /** When Layers cannot tell, the employee explains the connection and decides. */
-function UnsureForm({ a }: { a: BubbleActions }) {
+function UnsureForm({ a, question }: { a: BubbleActions; question?: string }) {
   const [note, setNote] = useState('');
   return (
     <form
@@ -149,11 +151,12 @@ function UnsureForm({ a }: { a: BubbleActions }) {
       }}
     >
       <div className="b-main b-main--flush">
+        {question && <p className="b-text b-question">{question}</p>}
         <div className="b-ask">
           <input
             type="text"
             value={note}
-            placeholder={`How does it connect to ${project.name}?`}
+            placeholder={question ? 'Your answer' : `How does it connect to ${project.name}?`}
             aria-label={`How this connects to ${project.name}`}
             autoComplete="off"
             onChange={(e) => setNote(e.target.value)}
@@ -492,8 +495,17 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
               <h2 className="b-title">I'm not sure this fits {project.name}.</h2>
               <p className="b-text">{scene.reason} Nothing was sent yet.</p>
               <SignalList signals={scene.signals} />
+              {scene.trimmed && (
+                <div className="b-detail">
+                  <p className="b-rule">Part of this is project work</p>
+                  <p className="b-quote">{scene.trimmed}</p>
+                  <button type="button" className="b-link" onClick={a.sendTrimmed}>
+                    Send only that part
+                  </button>
+                </div>
+              )}
             </div>
-            <UnsureForm a={a} />
+            <UnsureForm a={a} question={scene.question} />
           </>
         ),
       };

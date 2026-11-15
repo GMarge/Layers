@@ -39,6 +39,17 @@ const hits = (re: RegExp, text: string) => [
 
 const list = (words: string[]) => words.map((w) => `"${w}"`).join(', ');
 
+const CLAUSES = /\s*(?:;|\.\s+|,?\s+and then\s+|,?\s+and also\s+|,?\s+and\s+|,?\s+then\s+|,?\s+also\s+|,?\s+plus\s+)\s*/i;
+
+/** For a mixed prompt: the project work alone. Empty when the two cannot be told apart. */
+function projectPart(prompt: string): string {
+  const clauses = prompt.split(CLAUSES).map((c) => c.replace(/^[ .]+|[ .]+$/g, '')).filter(Boolean);
+  const kept = clauses.filter((c) => ON_PROJECT.test(c) && !OFF_TOPIC.test(c));
+  if (kept.length === 0 || kept.length === clauses.length) return '';
+  const text = kept.join(' and ');
+  return text[0]!.toUpperCase() + text.slice(1);
+}
+
 function classify(prompt: string): Verdict {
   const fits = hits(ON_PROJECT, prompt);
   const against = hits(OFF_TOPIC, prompt);
@@ -50,6 +61,7 @@ function classify(prompt: string): Verdict {
       rule: assignedWorkRule,
       reason: `It mentions ${list(fits)} from the ${project.name} brief, and also ${list(against)}, which the brief does not cover.`,
       signals: { fits, against },
+      trimmed: projectPart(prompt) || undefined,
     };
   }
   if (fits.length === 0 && against.length === 0 && VAGUE.test(prompt)) {

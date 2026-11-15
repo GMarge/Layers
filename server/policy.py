@@ -62,6 +62,20 @@ def screen(prompt: str) -> dict:
             "reason": f"Nothing in this prompt names {project} or anything in its brief."}
 
 
+CLAUSES = re.compile(r"\s*(?:;|\.\s+|,?\s+and then\s+|,?\s+and also\s+|,?\s+and\s+|,?\s+then\s+|,?\s+also\s+|,?\s+plus\s+)\s*", re.I)
+
+
+def project_part(prompt: str) -> str:
+    """For a prompt that mixes project work with something else: the project work alone.
+    Empty when the two cannot be told apart. Whatever comes back is checked again when sent."""
+    clauses = [c.strip(" .") for c in CLAUSES.split(prompt) if c and c.strip(" .")]
+    kept = [c for c in clauses if ON_PROJECT.search(c) and not OFF_TOPIC.search(c)]
+    if not kept or len(kept) == len(clauses):
+        return ""
+    text = " and ".join(kept)
+    return text[0].upper() + text[1:]
+
+
 def learn_from(prompt: str) -> list[str]:
     """The employee said this prompt is project work. Remember its distinctive words so
     the same kind of request is not flagged again. This is the adaptive part, and it is

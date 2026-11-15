@@ -49,7 +49,7 @@ cd ~/layers && sqlite3 layers.db "delete from settings where key like 'runs:%'"
 | 11 | Click **What I did**, then **Undo** | The steps with timings. Undo removes the sheet and resets the task. |
 | 12 | Send `Create a presentation outline for the Project X readout` and use it | `ReadoutOutline_v3` this time. "Draft presentation" moves to in progress. |
 | 13 | Right-click the agent, choose **Today so far**, click **Draft an update** | Plan, two tool calls, then a draft you can edit. Nothing is sent yet. |
-| 14 | Change a few words and click **Send my wording to Priya** | "Sent to Priya". On the Manager view it shows under Jordan, in your wording. |
+| 14 | Change a few words and click **Send my wording to Priya** | "Sent to Priya". On the Manager view it shows under Gavin, in your wording. |
 | 15 | Right-click the agent, choose **What Layers did** | How it works, every tool it has, and each run with its tool calls. "Plain code, no model" marks the ones the gate settled alone. |
 | 16 | Tap the agent and ask `Has my team built a competitor matrix?` | The workflow, with a button to use it. |
 | 17 | Type a draft, tap the agent, click **Check my draft** | The same check as Send, without sending. |
@@ -72,7 +72,7 @@ cd ~/layers && sqlite3 layers.db "delete from settings where key like 'runs:%'"
 | 24 | Manager view, **Rules**: choose **Warn, and let them decide** | On the employee side a note says Priya changed a rule. A held prompt now offers **Send anyway**. |
 | 25 | Choose **Send it to me** for unclear prompts, then send an unclear prompt | It goes to **Needs you** by itself, with the reason. |
 | 26 | Click **Marcus Bell**, then **Ines Okafor** | Their sample activity, progress and branch maps. They are marked Sample. |
-| 27 | Look at Jordan's branch map | Lines named by project area. No prompt text anywhere. |
+| 27 | Look at Gavin's branch map | Lines named by project area. No prompt text anywhere. |
 | 28 | **Audit trail**, Show | One line per check, tool call and decision, with timings. No prompt text. |
 | 29 | Open **Side by side** | Both views at once. An approval on the right lands on the left within two seconds. |
 
