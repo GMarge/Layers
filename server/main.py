@@ -17,6 +17,20 @@ from . import agent, db, policy, tools  # noqa: E402
 
 app = FastAPI(title="Layers", docs_url=None, redoc_url=None)
 
+# Agent runs the harness has paused, waiting for the employee's click. Keyed by prompt.
+PAUSED: dict[str, dict] = {}
+
+SEED_CHAT = [
+    {"role": "user", "content": "Which five competitors should the Project X analysis cover? One line on each."},
+    {"role": "assistant", "content": "These five cover the range: " + ", ".join(db.COMPETITORS) + "."},
+]
+# What the workspace model has been told so far, so follow-up questions make sense.
+CHAT: list[dict] = list(SEED_CHAT)
+
+
+def act_task(workflow_id: str) -> str:
+    return (f"ACT: apply workflow {workflow_id} to {db.PROJECT['name']} for the employee.")
+
 Prompt = Field(min_length=1, max_length=4000)
 
 
@@ -93,6 +107,8 @@ def health():
 @app.post("/api/reset")
 def reset():
     db.reset()
+    PAUSED.clear()
+    CHAT[:] = SEED_CHAT
     return {"ok": True}
 
 
@@ -128,6 +144,7 @@ def preflight(body: PromptIn):
             if supervisor:
                 try:
                     agent.run(supervisor, f"REVIEW this prompt the employee tried to send:\n<prompt>\n{prompt}\n</prompt>")
+                    scratch = tools._scratch
                     said = scratch.get("verdict")
                     # The model may explain and refine, but it cannot clear what the rules flagged.
                     if said and not (screen["kind"] == "policy" and said["kind"] in ("pass", "reuse")):
@@ -146,6 +163,25 @@ def preflight(body: PromptIn):
                     kind = "pass"
                 else:
                     policy.record(prompt, "reuse", False, reason, decided_by)
+                    if supervisor:
+                        # Start the work now. The harness stops the agent just before it creates
+                        # anything, and holds it there until the employee decides.
+                        steps: list[dict] = []
+
+                        def keep(event):
+                            note(event)
+                            if event["type"] == "step" and event["step"]["status"] != "running":
+                                steps.append(event)
+
+                        tools.start_run(keep)
+                        thread = f"apply-{len(PAUSED)}-{abs(hash(prompt))}"
+                        try:
+                            _, paused = agent.run(supervisor, act_task(item["id"]), thread)
+                            if paused:
+                                PAUSED[prompt] = {"thread": thread, "workflow": item["id"], "steps": steps}
+                                db.audit("harness", "paused_for_approval", {"workflow": item["id"]})
+                        except Exception as exc:
+                            db.audit("server", "agent_failed", str(exc))
                     return {"type": "verdict", "verdict": {
                         "kind": "reuse", "item": item,
                         "reason": f"{item['author']} already built a workflow for this."}}
@@ -172,8 +208,22 @@ def apply(body: ApplyIn):
             supervisor = agent.get()
             if supervisor:
                 try:
-                    agent.run(supervisor, f"ACT: the employee approved reusing workflow {body.workflow_id} "
-                                          f"for {db.PROJECT['name']}. Apply it now.")
+                    held = PAUSED.pop(body.prompt.strip(), None)
+                    if held and held["workflow"] == body.workflow_id:
+                        for event in held["steps"]:  # what the agent did before it paused
+                            emit(event)
+                        thread, paused = held["thread"], True
+                        scratch["access_ok"] = body.workflow_id
+                    else:
+                        thread = f"apply-now-{id(scratch)}"
+                        _, paused = agent.run(supervisor, act_task(body.workflow_id), thread)
+                    if paused:
+                        # The employee's click is the approval the harness was waiting for.
+                        db.audit(db.EMPLOYEE["name"], "approved_paused_action", {"workflow": body.workflow_id})
+                        emit({"type": "step", "step": {
+                            "id": f"approval-{thread}", "tool": "human_approval", "status": "done",
+                            "label": "Paused until you approved", "detail": f"approved by {db.EMPLOYEE['name']}"}})
+                        agent.resume(supervisor, thread, True)
                 except Exception as exc:
                     db.audit("server", "agent_failed", str(exc))
             # Whatever the model did or skipped, finish the job in order and never skip the access check.
@@ -243,7 +293,7 @@ def ask(body: PromptIn):
             supervisor = agent.get()
             if supervisor:
                 try:
-                    said = agent.run(supervisor, "The employee asks you, before sending anything: "
+                    said, _ = agent.run(supervisor, "The employee asks you, before sending anything: "
                                                  f"<question>{question}</question> Answer in two sentences.")
                     if said:
                         answer = {"text": said}
@@ -324,10 +374,12 @@ def chat(body: PromptIn):
         from langchain.chat_models import init_chat_model
 
         agent.spend_run()
-        reply = init_chat_model(agent.MODEL).invoke(prompt)
+        CHAT.append({"role": "user", "content": prompt})
+        reply = init_chat_model(agent.MODEL).invoke(CHAT[-24:])
         text = reply.content
         if isinstance(text, list):  # some providers answer in content blocks
             text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
+        CHAT.append({"role": "assistant", "content": text})
         return {"text": text, "placeholder": False}
     except Exception as exc:
         db.audit("server", "chat_failed", str(exc))
