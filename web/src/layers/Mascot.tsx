@@ -252,8 +252,8 @@ export function Mascot(props: Props) {
 
       <svg className="goo-defs" width="0" height="0" aria-hidden="true">
         <filter id="layers-goo" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="5" />
-          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10" />
+          <feGaussianBlur in="SourceGraphic" stdDeviation="4" />
+          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -7" />
         </filter>
       </svg>
     </button>

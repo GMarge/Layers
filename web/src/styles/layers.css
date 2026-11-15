@@ -1361,7 +1361,7 @@ li[data-status='done'] .steps__mark {
 }
 
 .mascot[data-phase='rising'] .goo__pool {
-  animation: pool-out 560ms cubic-bezier(0.4, 0, 0.6, 1) 340ms both;
+  animation: pool-out 560ms cubic-bezier(0.4, 0, 0.6, 1) 80ms both;
 }
 
 .mascot[data-phase='rising'] .nib-eyes {
@@ -1379,7 +1379,7 @@ li[data-status='done'] .steps__mark {
 }
 
 .mascot[data-phase='sinking'] .goo__pool {
-  animation: pool-in 620ms cubic-bezier(0.3, 0, 0.2, 1) both;
+  animation: pool-in 400ms cubic-bezier(0.3, 0, 0.2, 1) 170ms both;
 }
 
 .mascot[data-phase='sinking'] .nib-eyes {
@@ -1442,6 +1442,11 @@ li[data-status='done'] .steps__mark {
   }
   34% {
     opacity: 1;
+  }
+  /* The eyes drop a little ahead of the liquid, so they never ride above its surface. */
+  58% {
+    opacity: 1;
+    transform: translateY(calc(var(--eye-lift) * 0.16)) scale(1.08);
   }
   100% {
     opacity: 1;
