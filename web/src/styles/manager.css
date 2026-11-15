@@ -1,0 +1,234 @@
+/* The manager's page. Same quiet workspace language; blue still means Layers. */
+
+.mgr {
+  display: grid;
+  align-content: start;
+  gap: 28px;
+  width: min(880px, 100%);
+  height: 100dvh;
+  margin: 0 auto;
+  padding: 40px 24px 48px;
+  overflow-y: auto;
+}
+
+.mgr p,
+.mgr h1,
+.mgr h2,
+.mgr ol,
+.mgr ul,
+.mgr blockquote {
+  margin: 0;
+}
+
+.mgr__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.mgr h1 {
+  font-size: 22px;
+  font-weight: 660;
+  font-stretch: var(--w-wide);
+  letter-spacing: -0.01em;
+}
+
+.mgr h1 span {
+  font-weight: 460;
+  font-stretch: var(--w-normal);
+  color: var(--ink-2);
+}
+
+.mgr__top p {
+  margin-top: 4px;
+  font-size: 13.5px;
+  color: var(--ink-3);
+}
+
+.mgr__who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 !important;
+  font-weight: 620;
+  font-stretch: var(--w-wide);
+  color: var(--agent-ink) !important;
+}
+
+.mgr__who .glyph {
+  width: 26px;
+  height: 26px;
+}
+
+.mgr section {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.mgr h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 640;
+}
+
+.mgr h2 b {
+  display: grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--agent);
+  color: #fff;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  align-self: center;
+}
+
+.mgr h2 span {
+  font-size: 13px;
+  font-weight: 440;
+  color: var(--ink-3);
+}
+
+.mgr__empty {
+  font-size: 14px;
+  color: var(--ink-3);
+}
+
+.mgr__req {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  animation: land 420ms var(--ease-out);
+}
+
+.mgr__meta {
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.mgr__meta code {
+  margin-right: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--well);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.mgr blockquote {
+  font-size: 17px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.mgr__why,
+.mgr__note {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.mgr__why b {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.mgr__acts {
+  display: flex;
+  gap: 6px;
+  width: min(320px, 100%);
+  margin-top: 4px;
+}
+
+.mgr__cols {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 40px;
+}
+
+.mgr__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  font-size: 13px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.mgr__counts b {
+  margin-right: 5px;
+  font-size: 15px;
+  font-weight: 660;
+  color: var(--ink);
+}
+
+.mgr__feed {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.mgr__feed li {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 8px;
+  animation: land 320ms var(--ease-out);
+}
+
+.mgr__feed time {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.7;
+}
+
+.mgr__tasks {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.mgr__tasks li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.mgr__tasks em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.mgr__fine {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.mgr :focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .mgr__cols {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+}

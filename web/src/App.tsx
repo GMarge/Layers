@@ -360,12 +360,13 @@ export default function App() {
   };
 
   /** Stands in for the manager's inbox until the backend exists. */
-  const decide = (approved: boolean) => {
+  /** `answered` is true when the manager already recorded the answer on the server. */
+  const decide = (approved: boolean, answered = false) => {
     const s = sceneRef.current.name === 'pending' ? sceneRef.current : stash.current;
     if (!s || s.name !== 'pending') return;
     const token = ++run.current;
     stash.current = null;
-    settled.current = service.decide?.(s.requestId, approved).catch(() => {}) ?? Promise.resolve();
+    if (!answered) settled.current = service.decide?.(s.requestId, approved).catch(() => {}) ?? Promise.resolve();
     setScene({ name: 'decided', approved, approver: s.approver });
     if (!approved) {
       setHold({ kind: 'policy', label: `Declined by ${s.approver}. Draft kept.` });
@@ -379,6 +380,26 @@ export default function App() {
       focusPrompt();
     });
   };
+
+  const decideRef = useRef(decide);
+  decideRef.current = decide;
+
+  // While a request is with the manager, watch for their answer.
+  const pendingId = hold?.kind === 'pending' && scene.name === 'pending' ? scene.requestId : null;
+  const watchedId = useRef<string | null>(null);
+  if (pendingId) watchedId.current = pendingId;
+  if (hold?.kind !== 'pending') watchedId.current = null;
+  const watching = hold?.kind === 'pending' ? watchedId.current : null;
+  useEffect(() => {
+    if (!watching || !service.approvalStatus) return;
+    const check = service.approvalStatus;
+    const timer = setInterval(() => {
+      void check(watching).then((status) => {
+        if (status !== 'pending') decideRef.current(status === 'approved', true);
+      });
+    }, 1500);
+    return () => clearInterval(timer);
+  }, [watching, service]);
 
   const runWorkflow = async (item: KnowledgeItem, prompt: string, instant = false) => {
     const token = ++run.current;

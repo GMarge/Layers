@@ -136,6 +136,8 @@ export interface LayersService {
   /** Tell the server what the company has chosen. The server enforces it. */
   sync?(settings: { policyMode: PolicyMode; unsureMode: UnsureMode }): Promise<void>;
   reset?(): Promise<void>;
+  /** Where an approval request stands, so the employee's side updates when the manager answers. */
+  approvalStatus?(requestId: string): Promise<'pending' | 'approved' | 'declined'>;
 }
 
 /** What the Layers overlay is showing right now. */

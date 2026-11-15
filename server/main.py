@@ -386,6 +386,69 @@ def chat(body: PromptIn):
         return {"text": "Layers cleared this prompt, but the workspace model did not answer.", "placeholder": True}
 
 
+@app.get("/api/approvals/{request_id}")
+def approval_status(request_id: str):
+    number = request_id.removeprefix("EX-")
+    rows = db.query("SELECT status FROM approvals WHERE id = ?", (int(number),)) if number.isdigit() else []
+    if not rows:
+        raise HTTPException(404, "No such request.")
+    return {"status": rows[0]["status"]}
+
+
+@app.get("/api/manager")
+def manager():
+    """What the manager sees. Prompts appear only when the employee sent them for approval.
+    Everything else is shown as counts and outcomes, never as text."""
+    first = db.EMPLOYEE["name"].split()[0]
+    pending = []
+    for row in db.query("SELECT * FROM approvals WHERE status = 'pending' ORDER BY id DESC"):
+        screen = policy.screen(row["prompt"])
+        why = db.query("SELECT reason FROM decisions WHERE prompt = ? AND allowed = 0 ORDER BY id DESC LIMIT 1",
+                       (row["prompt"],))
+        pending.append({"id": f"EX-{row['id']:04d}", "prompt": row["prompt"], "note": row["note"],
+                        "reason": why[0]["reason"] if why else screen["reason"], "signals": screen["signals"],
+                        "from": db.EMPLOYEE["name"], "at": row["created_at"]})
+
+    feed = []
+    for a in db.query("SELECT ts, actor, action, detail FROM audit ORDER BY id DESC LIMIT 200"):
+        action, text = a["action"], None
+        if action == "tool:create_project_artifact":
+            text = f"{first} reused a team workflow. A comparison sheet was added to {db.PROJECT['name']}."
+        elif action == "tool:request_manager_approval":
+            text = f"{first} asked for your approval."
+        elif action == "decision:manager-approved":
+            text = "You approved a request."
+        elif action == "decision:manager-declined":
+            text = "You declined a request."
+        elif action == "decision:policy":
+            text = "Layers held a prompt under rule AI-01."
+        elif action == "decision:unsure":
+            text = "Layers was not sure about a prompt and asked before sending."
+        elif action == "decision:employee-note":
+            text = f"{first} explained an unclear prompt and sent it."
+        elif action == "decision:employee-override":
+            text = f"{first} sent a prompt after a warning. It is logged as an exception."
+        elif action == "undo":
+            text = f"{first} undid a reused workflow."
+        if text:
+            feed.append({"ts": a["ts"], "text": text})
+
+    def count(where: str) -> int:
+        return db.query(f"SELECT COUNT(*) AS n FROM decisions WHERE {where}")[0]["n"]
+
+    return {
+        "manager": db.MANAGER, "employee": db.EMPLOYEE, "project": db.PROJECT,
+        "pending": pending, "feed": feed[:12],
+        "tasks": db.query("SELECT id, title, status FROM tasks"),
+        "counts": {
+            "checked": count("decided_by IN ('gate', 'agent')"),
+            "passed": count("decided_by IN ('gate', 'agent') AND allowed = 1"),
+            "held": count("verdict IN ('policy', 'unsure')"),
+            "reused": db.query("SELECT COUNT(*) AS n FROM artifacts")[0]["n"],
+        },
+    }
+
+
 @app.get("/api/audit")
 def audit_log():
     return db.query("SELECT ts, actor, action, detail FROM audit ORDER BY id DESC LIMIT 100")
