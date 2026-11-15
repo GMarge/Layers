@@ -23,6 +23,8 @@ LABELS = {
     "update_task_status": "Updating your Project X tasks",
     "request_manager_approval": f"Asking {db.MANAGER} to take a look",
     "submit_verdict": "Deciding what to do with this prompt",
+    "get_todays_activity": "Reading what got done today",
+    "send_status_update": f"Sending the update to {db.MANAGER}",
 }
 
 # One run at a time reports its tool calls to the interface. This is a single-user demo.
@@ -209,6 +211,48 @@ def submit_verdict(kind: str, reason: str, workflow_id: str = "", topic: str = "
     return _traced("submit_verdict", body)
 
 
+def get_todays_activity() -> str:
+    """Return what the employee got done today: task progress, documents added to the project,
+    how many prompts were checked, cleared and held, and how the conversation branched.
+    It never includes anything the employee typed."""
+    def body():
+        tasks = db.query("SELECT title, status FROM tasks")
+        made = [a["title"] for a in db.query("SELECT title FROM artifacts ORDER BY created_at")]
+
+        def count(where: str) -> int:
+            return db.query(f"SELECT COUNT(*) AS n FROM decisions WHERE {where}")[0]["n"]
+
+        shape = json.loads(db.setting("branches") or "null") or {"lines": [], "nodes": []}
+        directions = [{"about": line["label"],
+                       "prompts": sum(1 for node in shape["nodes"] if node["line"] == line["id"]),
+                       "own_chat": line["kind"] == "explicit"} for line in shape["lines"]]
+        activity = {
+            "tasks": tasks, "documents_added": made,
+            "prompts": {"checked": count("decided_by IN ('gate', 'agent')"),
+                        "went_straight_through": count("decided_by IN ('gate', 'agent') AND allowed = 1"),
+                        "held": count("verdict IN ('policy', 'unsure')")},
+            "approvals_asked": db.query("SELECT COUNT(*) AS n FROM approvals")[0]["n"],
+            "directions": directions,
+        }
+        done = sum(1 for t in tasks if t["status"] == "done")
+        doing = sum(1 for t in tasks if t["status"] == "doing")
+        return json.dumps(activity), f"{done} done, {doing} in progress, {len(made)} documents"
+    return _traced("get_todays_activity", body)
+
+
+def send_status_update(text: str) -> str:
+    """Send the employee's manager a short status update. Give the full text of the update.
+    The system pauses here until the employee has read it and approved it."""
+    def body():
+        clean = " ".join(str(text).split())[:1200]
+        if not clean:
+            raise ValueError("the update is empty")
+        cur = db.execute("INSERT INTO updates (text, created_at) VALUES (?, ?)", (clean, time.time()))
+        _scratch["update_id"] = cur.lastrowid
+        return f"Sent to {db.MANAGER}.", f"{len(clean.split())} words"
+    return _traced("send_status_update", body)
+
+
 REVIEW_TOOLS = [get_project_context, check_company_policy, search_org_memory, submit_verdict]
 ACTION_TOOLS = [search_org_memory, check_access, create_project_artifact, update_task_status,
-                request_manager_approval]
+                request_manager_approval, get_todays_activity, send_status_update]

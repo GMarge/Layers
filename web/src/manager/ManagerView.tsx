@@ -34,6 +34,8 @@ interface Member {
   pending: number;
   feed: { ts?: number; text: string }[];
   branches: MapShape | null;
+  /** Status updates this person chose to send, newest first. */
+  updates?: { ts: number; text: string }[];
 }
 
 interface Settings {
@@ -318,6 +320,22 @@ export function ManagerView() {
               {member.project.name}, {member.project.title.toLowerCase()}. Due {member.project.due}.
             </span>
           </h2>
+
+          {member.updates && member.updates.length > 0 && (
+            <div className="mgr__col">
+              <h3>
+                Updates from {first} <span>{first} read and approved each one before it was sent</span>
+              </h3>
+              <ul className="mgr__updates">
+                {member.updates.map((u) => (
+                  <li key={u.ts}>
+                    <time>{clock(u.ts)}</time>
+                    <p>{u.text}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="mgr__cols">
             <div className="mgr__col">

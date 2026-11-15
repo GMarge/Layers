@@ -586,6 +586,211 @@ button.bmap__dot:hover::after,
   font-variant-numeric: tabular-nums;
 }
 
+/* The update for the manager: drafted by the agent, sent only by the employee. */
+
+.bpanel__update {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.bpanel__update .bpanel__intro b {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.bpanel__btn--go {
+  background: var(--agent);
+  color: #fff;
+}
+
+.bpanel__btn--go:hover {
+  background: var(--agent-press);
+}
+
+.bpanel__draft {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.bpanel__draft:focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 1px;
+}
+
+.bpanel__update .bpanel__acts {
+  width: min(420px, 100%);
+}
+
+.bpanel__sent {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--canvas);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.bpanel__sent b {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+/* The Agent tab: how it works, what it can do, and what it did. */
+
+.bpanel__how {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: how;
+}
+
+.bpanel__how li {
+  position: relative;
+  padding: 12px 14px 12px 46px;
+  border-radius: 12px;
+  background: var(--canvas);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  counter-increment: how;
+}
+
+.bpanel__how li::before {
+  content: counter(how);
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 11.5px;
+  font-weight: 650;
+}
+
+.bpanel__how b {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.bpanel__tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 20px;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.bpanel__tools li {
+  display: grid;
+  gap: 1px;
+}
+
+.bpanel__tools code {
+  font-size: 10.5px;
+  color: var(--agent-ink);
+}
+
+.bpanel__tools em {
+  justify-self: start;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--agent-tint);
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 560;
+  color: var(--agent-ink);
+}
+
+.bpanel__runs {
+  display: grid;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  list-style: none;
+}
+
+.bpanel__runs li {
+  border-bottom: 1px solid var(--line);
+}
+
+.bpanel__runs li:last-child {
+  border-bottom: 0;
+}
+
+.bpanel__runs summary {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr) auto auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  cursor: default;
+  list-style: none;
+}
+
+.bpanel__runs summary::-webkit-details-marker {
+  display: none;
+}
+
+.bpanel__runs summary:hover {
+  background: var(--canvas);
+}
+
+.bpanel__runs time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.bpanel__runs summary b {
+  font-weight: 600;
+}
+
+.bpanel__by {
+  padding: 1px 7px;
+  border-radius: 7px;
+  background: var(--well);
+  font-size: 11px;
+  font-weight: 560;
+  color: var(--ink-3);
+}
+
+/* Blue only when the agent itself ran. */
+.bpanel__by[data-by='agent'] {
+  background: var(--agent-tint);
+  color: var(--agent-ink);
+}
+
+.bpanel__runs details[open] {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 14px;
+}
+
+.bpanel__runs details > :not(summary) {
+  margin-left: 14px;
+  margin-right: 14px;
+}
+
 .bpanel :focus-visible {
   outline: 2px solid var(--agent);
   outline-offset: 2px;
@@ -650,6 +855,75 @@ button.bmap__dot:hover::after,
 .side__chat button:focus-visible,
 .topbar__branches:focus-visible,
 .thread__mark button:focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 1px;
+}
+
+/* Example prompts in the sidebar. They belong to the workspace, so they stay grey. */
+
+.try {
+  display: grid;
+  gap: 4px;
+}
+
+.try__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 8px 4px;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.try__head svg {
+  transition: transform var(--t-fast);
+}
+
+.try__head[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.try ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.try li button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  text-align: left;
+}
+
+.try li button:hover {
+  background: var(--well);
+}
+
+.try li b {
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+}
+
+.try li span {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.try button:focus-visible {
   outline: 2px solid var(--agent);
   outline-offset: 1px;
 }
@@ -811,6 +1085,19 @@ button.bmap__dot:hover::after,
 
   .bpanel__intro {
     flex-direction: column;
+  }
+
+  .bpanel__tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bpanel__runs summary {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .bpanel__runs time,
+  .bpanel__runs summary .bpanel__n {
+    display: none;
   }
 
   .topbar__crumb,

@@ -110,7 +110,7 @@ interface Props {
   /** Reports when the agent is being held over the chat box. */
   onOverBoxChange: (over: boolean) => void;
   /** Open the page with the branch map, or today so far. */
-  onOpenPanel: (tab: 'branches' | 'today') => void;
+  onOpenPanel: (tab: 'branches' | 'today' | 'agent') => void;
 }
 
 export function AgentCluster(props: Props) {
@@ -343,6 +343,7 @@ export function AgentCluster(props: Props) {
           items={[
             { label: 'Branches', onChoose: () => (setMenu(null), props.onOpenPanel('branches')) },
             { label: 'Today so far', onChoose: () => (setMenu(null), props.onOpenPanel('today')) },
+            { label: `What ${name} did`, onChoose: () => (setMenu(null), props.onOpenPanel('agent')) },
             { label: hiddenNow ? `Show ${name}` : `Hide ${name}`, hint: 'Alt L', onChoose: chooseMenu },
           ]}
           onClose={() => setMenu(null)}

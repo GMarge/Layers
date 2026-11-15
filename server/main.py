@@ -4,6 +4,7 @@ import json
 import queue
 import re
 import threading
+import uuid
 from typing import Callable, Literal
 
 from dotenv import load_dotenv
@@ -28,6 +29,8 @@ app = FastAPI(title="Layers", docs_url=None, redoc_url=None)
 
 # Agent runs the harness has paused, waiting for the employee's click. Keyed by prompt.
 PAUSED: dict[str, dict] = {}
+# Status updates the agent has drafted and is paused on, keyed by the run's thread.
+DRAFTS: dict[str, dict] = {}
 
 SEED_CHAT = [
     {"role": "user", "content": "Which five competitors should the Project X analysis cover? One line on each."},
@@ -205,6 +208,7 @@ def health():
 def reset():
     db.reset()
     PAUSED.clear()
+    DRAFTS.clear()
     CHAT[:] = SEED_CHAT
     return {"ok": True}
 
@@ -252,13 +256,15 @@ def preflight(body: PreflightIn):
         if screen["kind"] == "pass":
             policy.record(prompt, "pass", True, "On project.", "gate")
             emit({"type": "progress", "engaged": False})
-            return {"type": "verdict", "verdict": {"kind": "pass"}}
+            return {"type": "verdict", "verdict": {"kind": "pass", "by": "gate"}}
 
-        def note(event):  # each tool call shows up as a line of plain English
+        def note(event):  # each tool call shows up as a line of plain English, then in full
             if event["type"] == "plan":
                 emit({"type": "progress", "engaged": True, "note": "Planning the steps"})
-            elif event["type"] == "step" and event["step"]["status"] == "running":
-                emit({"type": "progress", "engaged": True, "note": event["step"]["label"]})
+            elif event["type"] == "step":
+                step = event["step"]
+                emit({"type": "progress", "engaged": True, "step": step,
+                      **({"note": step["label"]} if step["status"] == "running" else {})})
 
         scratch = tools.start_run(note)
         try:
@@ -273,6 +279,7 @@ def preflight(body: PreflightIn):
                 # extra model run, and it is what lets the branches follow meaning, not keywords.
                 if judged:
                     found["topic"] = hint
+                found["by"] = "agent" if decided_by == "agent" else "gate"
                 return {"type": "verdict", "verdict": found}
 
             supervisor = agent.get()
@@ -405,6 +412,111 @@ def undo(body: UndoIn):
     db.execute("UPDATE tasks SET status = 'todo' WHERE id = ?", (body.task_id,))
     db.audit(db.EMPLOYEE["name"], "undo", body.model_dump())
     return {"ok": True}
+
+
+UPDATE_TASK = (f"UPDATE: draft a short status update on {db.PROJECT['name']} for {db.MANAGER}, "
+               "written as the employee, then send it.")
+
+
+def plain_update() -> str:
+    """The same update written by plain code, for when no model is connected."""
+    tasks = db.query("SELECT title, status FROM tasks")
+    made = [a["title"] for a in db.query("SELECT title FROM artifacts ORDER BY created_at")]
+
+    def named(status: str) -> str:
+        return ", ".join(t["title"].lower() for t in tasks if t["status"] == status)
+
+    parts = [f"Here is where {db.PROJECT['name']} stands."]
+    if named("done"):
+        parts.append(f"Done: {named('done')}.")
+    if named("doing"):
+        parts.append(f"In progress: {named('doing')}.")
+    if made:
+        parts.append(f"Added to the project today: {', '.join(made)}.")
+    if named("todo"):
+        parts.append(f"Still to start: {named('todo')}.")
+    return " ".join(parts)
+
+
+class SendUpdateIn(BaseModel):
+    thread: str | None = Field(default=None, max_length=40)
+    text: str = Field(min_length=1, max_length=1200)
+    approved: bool = True
+
+
+@app.post("/api/update/draft")
+def draft_update():
+    """The agent drafts a status update from the day's results. The harness stops it before
+    anything is sent, and the draft comes back here for the employee to read."""
+
+    def work(emit):
+        scratch = tools.start_run(emit)
+        try:
+            text, thread = "", None
+            supervisor = agent.get()
+            if supervisor:
+                try:
+                    thread = f"update-{uuid.uuid4().hex[:8]}"
+                    _, paused = agent.run(supervisor, UPDATE_TASK, thread)
+                    call = agent.pending_call(supervisor, thread) if paused else None
+                    if call and call["name"] == "send_status_update":
+                        text = " ".join(str(call["args"].get("text", "")).split())
+                        db.audit("harness", "paused_for_approval", {"workflow": "send_status_update"})
+                except Exception as exc:
+                    db.audit("server", "agent_failed", str(exc))
+            if not text:  # no model, or it did not get as far as a draft: plain code writes it
+                thread = None
+                calls = scratch.get("calls", [])
+                if "get_project_context" not in calls:
+                    tools.get_project_context()
+                if "get_todays_activity" not in calls:
+                    tools.get_todays_activity()
+                text = plain_update()
+            if thread:
+                DRAFTS[thread] = {"text": text}
+            return {"type": "draft", "text": text, "thread": thread, "by": "agent" if thread else "code"}
+        finally:
+            tools.end_run()
+
+    return stream(work)
+
+
+@app.post("/api/update/send")
+def send_update(body: SendUpdateIn):
+    """The employee's answer to a drafted update: send it as written, send their own wording, or drop it."""
+
+    def work(emit):
+        scratch = tools.start_run(emit)
+        try:
+            text = " ".join(body.text.split())
+            held = DRAFTS.pop(body.thread, None) if body.thread else None
+            supervisor = agent.get()
+            if held and supervisor:
+                edited = text != held["text"]
+                try:
+                    db.audit(db.EMPLOYEE["name"],
+                             "approved_paused_action" if body.approved else "declined_paused_action",
+                             {"workflow": "send_status_update", "edited": edited})
+                    emit({"type": "step", "step": {
+                        "id": f"approval-{body.thread}", "tool": "human_approval", "status": "done",
+                        "label": "Paused until you approved" if body.approved else "You chose not to send it",
+                        "detail": (("edited and approved by " if edited else "approved by ") + db.EMPLOYEE["name"])
+                        if body.approved else f"declined by {db.EMPLOYEE['name']}"}})
+                    agent.resume(supervisor, body.thread, body.approved,
+                                 {"name": "send_status_update", "args": {"text": text}} if edited else None)
+                except Exception as exc:
+                    db.audit("server", "agent_failed", str(exc))
+            if not body.approved:
+                return {"type": "discarded"}
+            if "update_id" not in scratch:
+                tools.send_status_update(text)
+            # Whatever the model sent on, the words the employee approved are the ones kept.
+            db.execute("UPDATE updates SET text = ? WHERE id = ?", (text, scratch["update_id"]))
+            return {"type": "sent", "text": text}
+        finally:
+            tools.end_run()
+
+    return stream(work)
 
 
 @app.post("/api/ask")
@@ -657,6 +769,8 @@ def manager():
             text = f"{first} undid a reused workflow."
         elif action == "settings" and a["actor"] == db.MANAGER:
             text = "You changed the workspace rules."
+        elif action == "tool:send_status_update":
+            text = f"{first} sent you a status update."
         if text:
             feed.append({"ts": a["ts"], "text": text})
 
@@ -675,6 +789,8 @@ def manager():
         "team": db.EMPLOYEE["team"], "sample": False, "project": db.PROJECT, "tasks": tasks,
         "counts": counts, "pending": len(pending), "feed": feed[:12],
         "branches": json.loads(db.setting("branches") or "null"),
+        # Sent by the employee on purpose, after reading it, so the manager may read it too.
+        "updates": db.query("SELECT text, created_at AS ts FROM updates ORDER BY id DESC LIMIT 5"),
     }
     return {
         "manager": db.MANAGER, "employee": db.EMPLOYEE, "project": db.PROJECT,
@@ -723,7 +839,10 @@ def audit_trail(limit: int = 40) -> list[dict]:
         elif action == "paused_for_approval":
             what, note = "paused the agent before it created anything", str(info.get("workflow", ""))
         elif action == "approved_paused_action":
-            what, note = "approved the paused action", str(info.get("workflow", ""))
+            what = "approved the paused action"
+            note = str(info.get("workflow", "")) + (", after editing it" if info.get("edited") else "")
+        elif action == "declined_paused_action":
+            what, note = "declined the paused action", str(info.get("workflow", ""))
         elif action == "undo":
             what = "undid a reused workflow"
         elif action == "ask":

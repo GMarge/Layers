@@ -43,13 +43,14 @@ CREATE TABLE IF NOT EXISTS feedback (
   id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, prompt TEXT, created_at REAL
 );
 CREATE TABLE IF NOT EXISTS learned_terms (term TEXT PRIMARY KEY, learned_from TEXT, created_at REAL);
+CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, created_at REAL);
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, actor TEXT, action TEXT, detail TEXT
 );
 """
 
 TABLES = ["settings", "tasks", "rules", "workflows", "artifacts", "approvals", "decisions",
-          "feedback", "learned_terms", "audit"]
+          "feedback", "learned_terms", "updates", "audit"]
 
 
 def execute(sql: str, params: tuple = ()) -> sqlite3.Cursor:

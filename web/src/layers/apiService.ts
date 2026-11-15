@@ -117,6 +117,24 @@ const service: LayersService = {
   async branches(outline) {
     await post('branches', outline);
   },
+
+  async draftUpdate(onEvent) {
+    let draft: { text: string; thread: string | null; by: 'agent' | 'code' } | null = null;
+    await stream('update/draft', {}, (e) => {
+      if (e.type === 'step' || e.type === 'plan') onEvent(e as unknown as AgentEvent);
+      else if (e.type === 'draft') draft = { text: String(e.text), thread: (e.thread as string | null) ?? null, by: e.by === 'agent' ? 'agent' : 'code' };
+      else if (e.type === 'error') throw new Error(String(e.message));
+    });
+    if (!draft) throw new Error('No draft came back.');
+    return draft;
+  },
+
+  async sendUpdate(thread, text, approved, onEvent) {
+    await stream('update/send', { thread, text, approved }, (e) => {
+      if (e.type === 'step' || e.type === 'plan') onEvent(e as unknown as AgentEvent);
+      else if (e.type === 'error') throw new Error(String(e.message));
+    });
+  },
 };
 
 /** Returns the backend service if the Layers server is running, otherwise null. */

@@ -5,7 +5,6 @@ import '@fontsource-variable/martian-mono/wdth.css';
 import './styles/tokens.css';
 import './styles/workspace.css';
 import './styles/layers.css';
-import './styles/lab.css';
 import './styles/branches.css';
 import './styles/bubble-extra.css';
 import App from './App';

@@ -21,22 +21,16 @@ import {
   type TopicHint,
   type Tree,
 } from './branches/model';
-import {
-  DesignLab,
-  defaultLab,
-  loadName,
-  saveName,
-  type GlowLevel,
-  type LabScene,
-  type LabSettings,
-} from './lab/DesignLab';
+import { defaultSettings, loadName, saveName, type GlowLevel, type Settings } from './layers/prefs';
 import { AgentCluster } from './layers/AgentCluster';
 import type { BubbleActions, Prefs } from './layers/Bubble';
 import { EdgeGlow, type GlowMode } from './layers/EdgeGlow';
 import { connect, type BackendStatus } from './layers/apiService';
-import { createMockService, previewSteps } from './layers/mockService';
+import { createMockService } from './layers/mockService';
 import { Toast, type ToastState } from './layers/Toast';
 import type {
+  AgentEvent,
+  AgentRun,
   Counters,
   Hold,
   KnowledgeItem,
@@ -46,11 +40,13 @@ import type {
   Scene,
   Step,
   Task,
+  Todo,
   UnsureMode,
+  UpdateState,
   Verdict,
 } from './layers/types';
 import { useMediaQuery } from './ui/useMediaQuery';
-import { competitorMatrix, conversations, examplePrompts, manager, project, seedMessages, seedTasks } from './workspace/data';
+import { conversations, manager, project, seedMessages, seedTasks, tryPrompts } from './workspace/data';
 import { Workspace, type ForkMark } from './workspace/Workspace';
 
 /** What the first chat is called. Branches that become chats are named after their direction. */
@@ -69,7 +65,18 @@ interface Saved {
   at: number;
   /** A request that was with the manager when the page closed. */
   pending?: Extract<Scene, { name: 'pending' }>;
+  /** What the agent did, most recent first. */
+  runs?: AgentRun[];
 }
+
+const NO_UPDATE: UpdateState = { phase: 'idle', text: '', thread: null, by: 'code', steps: [] };
+
+const OUTCOME: Record<Verdict['kind'], string> = {
+  pass: 'Cleared. It went to the workspace model.',
+  policy: 'Held under rule AI-01. Nothing was sent.',
+  unsure: 'Could not tell if it is project work, so it asked.',
+  reuse: 'Found an approved team workflow and offered it instead.',
+};
 
 function loadSession(): Saved | null {
   try {
@@ -168,6 +175,9 @@ export default function App({ active = true }: { active?: boolean }) {
   const [scene, setScene] = useState<Scene>(saved?.pending ?? { name: 'ambient' });
   const [toast, setToast] = useState<ToastState | null>(null);
   const [counters, setCounters] = useState<Counters>(saved?.counters ?? NO_COUNTS);
+  const [runs, setRuns] = useState<AgentRun[]>(saved?.runs ?? []);
+  const logRun = (run: Omit<AgentRun, 'id' | 'at'>) =>
+    setRuns((all) => [{ ...run, id: crypto.randomUUID(), at: Date.now() }, ...all].slice(0, 20));
   const [nod, setNod] = useState(0);
   /** True while the agent is melted into the chat box. */
   const [absorbed, setAbsorbed] = useState(false);
@@ -175,12 +185,7 @@ export default function App({ active = true }: { active?: boolean }) {
   const [reserve, setReserve] = useState(0);
   /** The agent is being held over the chat box. */
   const [dropReady, setDropReady] = useState(false);
-  // On a phone-width screen the lab floats over the page, so it starts closed there.
-  const [lab, setLab] = useState<LabSettings>(() => ({
-    ...defaultLab,
-    open: !window.matchMedia('(max-width: 760px)').matches,
-    name: loadName(),
-  }));
+  const [lab, setLab] = useState<Settings>(() => ({ ...defaultSettings, name: loadName() }));
   const name = lab.name;
   useEffect(() => saveName(name), [name]);
   /** The branch map and today-so-far page, when it is open. */
@@ -189,7 +194,6 @@ export default function App({ active = true }: { active?: boolean }) {
   /** Bumped whenever the current flow is superseded, so late async work can tell it is stale. */
   const run = useRef(0);
   const abort = useRef<AbortController | null>(null);
-  const speed = useRef(1);
   /** The intervention the employee dismissed without resolving, so Review can bring it back. */
   const stash = useRef<Scene | null>(null);
 
@@ -205,7 +209,7 @@ export default function App({ active = true }: { active?: boolean }) {
   const restBeforeHide = useRef<Exclude<RestMode, 'hidden'>>('absorbed');
 
   // The real Layers server is used when it is running. Otherwise the scripted stand-in is.
-  const mock = useMemo(() => createMockService(() => speed.current), []);
+  const mock = useMemo(() => createMockService(), []);
   const [service, setService] = useState(mock);
   const [backend, setBackend] = useState<BackendStatus | null>(null);
   useEffect(() => {
@@ -267,8 +271,7 @@ export default function App({ active = true }: { active?: boolean }) {
   };
 
   const systemReduced = useMediaQuery('(prefers-reduced-motion: reduce)');
-  const reduced = systemReduced || lab.reduceMotion;
-  const sidebarHidden = useMediaQuery('(max-width: 760px)');
+  const reduced = systemReduced;
 
   // The shape of the conversation: which prompts sit on which branch.
   const [tree, setTree] = useState<Tree>(() => saved?.tree ?? seedTree(seedMessages[0]!.text ?? ''));
@@ -359,9 +362,21 @@ export default function App({ active = true }: { active?: boolean }) {
     // The model is told what this branch of the conversation has seen, and nothing else.
     const context = messagesRef.current
       // What Layers did counts as an answer, so the model does not try to redo it.
-      .filter((m) => !m.placeholder && m.text && isVisible(treeRef.current, m))
+      .filter((m) => !m.placeholder && (m.text || m.artifact) && isVisible(treeRef.current, m))
       .slice(-16)
-      .map((m) => ({ role: m.role === 'user' ? ('user' as const) : ('assistant' as const), content: m.text ?? '' }));
+      .map((m) => ({
+        role: m.role === 'user' ? ('user' as const) : ('assistant' as const),
+        // Everything the employee can see in the message, including a list or a document in it.
+        content: [
+          m.text ?? '',
+          ...(m.list ?? []).map((item) => `${item.name}: ${item.note}`),
+          m.artifact
+            ? `Document added to the project: ${m.artifact.title}. Columns: ${m.artifact.columns.join(', ')}. Rows: ${m.artifact.rows.map((r) => r[0]).join(', ')}.`
+            : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      }));
     post({ role: 'user', text: prompt }, line);
     if (service.reply) {
       const reply = service.reply;
@@ -447,11 +462,17 @@ export default function App({ active = true }: { active?: boolean }) {
     stash.current = null;
     setScene({ name: 'checking', engaged: false });
     let verdict: Verdict;
+    const began = performance.now();
+    let seen: Step[] = [];
     try {
       verdict = await service.preflight(
         prompt,
         (p) => {
-          if (token === run.current) setScene({ name: 'checking', engaged: p.engaged, note: p.note });
+          if (p.step) seen = upsert(seen, p.step);
+          // A finished tool call has no new line to show, so the last one stays up.
+          if (token === run.current && (p.note || !p.engaged)) {
+            setScene({ name: 'checking', engaged: p.engaged, note: p.note });
+          }
         },
         where(),
       );
@@ -463,6 +484,14 @@ export default function App({ active = true }: { active?: boolean }) {
     }
     if (token !== run.current) return;
     if (verdict.topic !== undefined) hints.current.set(prompt, verdict.topic);
+    logRun({
+      kind: 'review',
+      prompt,
+      by: !backend ? 'preview' : verdict.by === 'agent' ? 'agent' : 'code',
+      outcome: verdict.kind === 'reuse' ? `Found ${verdict.item.name} and offered it instead.` : OUTCOME[verdict.kind],
+      steps: seen,
+      ms: Math.round(performance.now() - began),
+    });
 
     setCounters((c) => ({ ...c, checked: c.checked + 1 }));
     if (verdict.kind === 'pass') {
@@ -634,7 +663,7 @@ export default function App({ active = true }: { active?: boolean }) {
     return () => clearInterval(timer);
   }, [active, watching, service]);
 
-  const runWorkflow = async (item: KnowledgeItem, prompt: string, instant = false) => {
+  const runWorkflow = async (item: KnowledgeItem, prompt: string) => {
     const token = ++run.current;
     abort.current?.abort();
     const controller = new AbortController();
@@ -645,8 +674,10 @@ export default function App({ active = true }: { active?: boolean }) {
     setHold(null);
     stash.current = null;
     setScene({ name: 'working', item, steps: [] });
+    const began = performance.now();
+    let done: Step[] = [];
+    let planned: Todo[] | undefined;
 
-    speed.current = instant ? 0 : 1;
     await service
       .applyWorkflow(
       item.id,
@@ -654,13 +685,24 @@ export default function App({ active = true }: { active?: boolean }) {
       (e) => {
         if (token !== run.current) return;
         if (e.type === 'plan') {
+          planned = e.todos;
           setScene((prev) => (prev.name === 'working' ? { ...prev, plan: e.todos } : prev));
           return;
         }
         if (e.type === 'step') {
+          done = upsert(done, e.step);
           setScene((prev) => (prev.name === 'working' ? { ...prev, steps: upsert(prev.steps, e.step) } : prev));
           return;
         }
+        logRun({
+          kind: 'apply',
+          prompt,
+          by: !backend ? 'preview' : backend.agent ? 'agent' : 'code',
+          outcome: e.summary,
+          plan: planned,
+          steps: done,
+          ms: Math.round(performance.now() - began),
+        });
         post({
           role: 'layers',
           text: `Reused ${item.name} instead of generating a new one.`,
@@ -691,7 +733,6 @@ export default function App({ active = true }: { active?: boolean }) {
         setScene({ name: 'ambient' });
         notify(`${name} could not finish that. Nothing was changed.`);
       });
-    speed.current = 1;
   };
 
   const applyWorkflow = () => {
@@ -796,6 +837,7 @@ export default function App({ active = true }: { active?: boolean }) {
     outline: lab.outline,
     policyMode: lab.policyMode,
     unsureMode: lab.unsureMode,
+    branchMode: lab.branchMode,
     name,
   };
 
@@ -818,6 +860,7 @@ export default function App({ active = true }: { active?: boolean }) {
     changeTree(s.tree);
     setTasks(s.tasks);
     setCounters(s.counters);
+    setRuns(s.runs ?? []);
   }, [active]);
   useEffect(() => {
     if (!active) return;
@@ -834,12 +877,65 @@ export default function App({ active = true }: { active?: boolean }) {
     const at = Date.now();
     stamp.current = at;
     try {
-      const session: Saved = { messages, tree, tasks, counters, seq: seq.current, at, pending: waiting };
+      const session: Saved = { messages, tree, tasks, counters, seq: seq.current, at, pending: waiting, runs };
       localStorage.setItem(SESSION_KEY, JSON.stringify(session));
     } catch {
       // Private windows can refuse storage. The conversation just won't survive a refresh.
     }
-  }, [active, messages, tree, tasks, counters, scene, hold]);
+  }, [active, messages, tree, tasks, counters, scene, hold, runs]);
+
+  // A status update for the manager. The agent drafts it, and it goes nowhere until approved.
+  const [update, setUpdate] = useState<UpdateState>(NO_UPDATE);
+  const updateRef = useRef(update);
+  updateRef.current = update;
+  const updateBegan = useRef(0);
+  const onUpdateEvent = (e: AgentEvent) =>
+    setUpdate((u) =>
+      e.type === 'plan' ? { ...u, plan: e.todos } : e.type === 'step' ? { ...u, steps: upsert(u.steps, e.step) } : u,
+    );
+
+  const draftUpdate = async () => {
+    if (!service.draftUpdate || updateRef.current.phase === 'working') return;
+    updateBegan.current = performance.now();
+    setUpdate({ ...NO_UPDATE, phase: 'working' });
+    try {
+      const draft = await service.draftUpdate(onUpdateEvent);
+      setUpdate((u) => ({ ...u, phase: 'draft', text: draft.text, thread: draft.thread, by: backend ? draft.by : 'preview' }));
+    } catch {
+      setUpdate(NO_UPDATE);
+      notify(`${name} could not draft that. Nothing was sent.`);
+    }
+  };
+
+  const sendUpdate = async (wording: string, approved: boolean) => {
+    const draft = updateRef.current;
+    const text = wording.trim();
+    if (draft.phase !== 'draft' || !service.sendUpdate || (approved && !text)) return;
+    setUpdate({ ...draft, phase: 'sending' });
+    try {
+      await service.sendUpdate(draft.thread, text || draft.text, approved, onUpdateEvent);
+    } catch {
+      setUpdate({ ...draft, phase: 'draft' });
+      notify('That did not go through. Nothing was sent.');
+      return;
+    }
+    const after = updateRef.current;
+    logRun({
+      kind: 'update',
+      prompt: `Status update for ${manager.first}`,
+      by: draft.by,
+      outcome: !approved
+        ? 'You chose not to send it. Nothing left the workspace.'
+        : text !== draft.text
+          ? 'Sent in your own wording, after you edited it.'
+          : 'Sent after you approved it.',
+      plan: after.plan,
+      steps: after.steps,
+      ms: Math.round(performance.now() - updateBegan.current),
+    });
+    setUpdate(approved ? { ...after, phase: 'sent', text, at: Date.now() } : NO_UPDATE);
+    notify(approved ? `Sent to ${manager.first}.` : 'Draft dropped. Nothing was sent.');
+  };
 
   /** Open a chat from the list, on the line the employee was last on inside it. */
   const openChat = (chat: string) => {
@@ -924,12 +1020,13 @@ export default function App({ active = true }: { active?: boolean }) {
       setPanel('branches');
     },
     setPrefs: (change) => setLab((s) => ({ ...s, ...change })),
+    // With no server there is no manager's page, so the preview lets you answer as the manager.
+    previewDecide: backend ? undefined : (approved) => decide(approved),
   };
 
   const reset = () => {
     run.current++;
     abort.current?.abort();
-    speed.current = 1;
     stash.current = null;
     hints.current.clear();
     setPanel(null);
@@ -950,58 +1047,8 @@ export default function App({ active = true }: { active?: boolean }) {
     setScene({ name: 'ambient' });
     setToast(null);
     setCounters(NO_COUNTS);
-  };
-
-  const typeInto = async (text: string, token: number) => {
-    if (reduced) {
-      setDraft(text);
-      return;
-    }
-    for (let i = 1; i <= text.length; i++) {
-      if (token !== run.current) return;
-      setDraft(text.slice(0, i));
-      await wait(14 + Math.random() * 22);
-    }
-    await wait(260);
-  };
-
-  /** Design lab: put the interface into one of its states from a clean start. */
-  const play = async (name: LabScene) => {
-    reset();
-    const token = run.current;
-    if (name === 'rest') return;
-
-    if (name === 'ask') {
-      setScene({ name: 'ask', question: '', busy: false, answer: null });
-      return;
-    }
-
-    if (name === 'settings') {
-      setScene({ name: 'settings' });
-      return;
-    }
-
-    if (name === 'policy' || name === 'knowledge' || name === 'unsure') {
-      const text =
-        name === 'policy'
-          ? examplePrompts.offTopic
-          : name === 'unsure'
-            ? examplePrompts.unsure
-            : examplePrompts.rebuild;
-      focusPrompt();
-      await wait(120);
-      await typeInto(text, token);
-      if (token === run.current) await send(text);
-      return;
-    }
-
-    if (name === 'working') {
-      post({ role: 'user', text: examplePrompts.rebuild }, track(examplePrompts.rebuild));
-      setScene({ name: 'working', item: competitorMatrix, steps: previewSteps });
-      return;
-    }
-
-    await runWorkflow(competitorMatrix, examplePrompts.rebuild, true);
+    setRuns([]);
+    setUpdate(NO_UPDATE);
   };
 
   useEffect(() => {
@@ -1012,14 +1059,7 @@ export default function App({ active = true }: { active?: boolean }) {
         toggleHiddenRef.current();
         return;
       }
-      if (e.key === 'Escape') {
-        dismissRef.current();
-        return;
-      }
-      const el = e.target as HTMLElement | null;
-      const typing = !!el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT' || el.isContentEditable);
-      if (typing || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key.toLowerCase() === 'l') setLab((s) => ({ ...s, open: !s.open }));
+      if (e.key === 'Escape') dismissRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -1038,19 +1078,6 @@ export default function App({ active = true }: { active?: boolean }) {
       prompts: c.prompts,
       byLayers: c.byLayers,
     }));
-
-  const labFloating = sidebarHidden || lab.layout === 'focus';
-  const labPanel = (
-    <DesignLab
-      settings={lab}
-      floating={labFloating}
-      backend={backend}
-      awaitingManager={hold?.kind === 'pending'}
-      onChange={setLab}
-      onScene={(name) => void play(name)}
-      onDecide={decide}
-    />
-  );
 
   return (
     <div
@@ -1091,7 +1118,20 @@ export default function App({ active = true }: { active?: boolean }) {
         layersHidden={lab.rest === 'hidden'}
         onShowLayers={toggleHidden}
         reserve={reserve}
-        sidebarSlot={labFloating ? null : labPanel}
+        tries={tryPrompts}
+        onTry={(prompt) => {
+          changeDraft(prompt);
+          focusPrompt();
+        }}
+        status={
+          !backend
+            ? 'Preview without the Layers server. Checks and branches work; answers are placeholders.'
+            : backend.agent
+              ? `Live agent on ${(backend.model ?? '').split(':').pop()}.`
+              : backend.model
+                ? 'Live server on rules only. The model did not load.'
+                : 'Live server on rules only. No model key is set.'
+        }
         onReset={reset}
         onDraftChange={changeDraft}
         onSend={() => void send()}
@@ -1127,6 +1167,18 @@ export default function App({ active = true }: { active?: boolean }) {
           agentName={name}
           tasks={tasks}
           counters={counters}
+          runs={runs}
+          update={update}
+          managerName={manager.first}
+          onDraftUpdate={() => void draftUpdate()}
+          onSendUpdate={(text, approved) => void sendUpdate(text, approved)}
+          live={
+            !backend
+              ? 'This is the preview without the Layers server, so a scripted stand-in plays the agent.'
+              : backend.agent
+                ? `The agent is live on ${(backend.model ?? '').split(':').pop()}.`
+                : 'The server is on rules only, so plain code does the work and no model is called.'
+          }
           onTab={setPanel}
           onClose={() => setPanel(null)}
           onOpenNode={openNode}
@@ -1150,7 +1202,6 @@ export default function App({ active = true }: { active?: boolean }) {
         />
       )}
       <Toast toast={toast} onClose={() => setToast(null)} />
-      {labFloating && labPanel}
       <div className="sr-only" role="status" aria-live="polite">
         {announce(scene, name)}
       </div>

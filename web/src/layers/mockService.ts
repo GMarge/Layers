@@ -213,5 +213,45 @@ export function createMockService(speed: () => number = () => 1): LayersService 
     async recordFeedback() {
       await wait(60);
     },
+
+    async draftUpdate(onEvent) {
+      onEvent({
+        type: 'plan',
+        todos: [
+          { content: "Read the project and today's activity", status: 'in_progress' },
+          { content: 'Write the update', status: 'pending' },
+          { content: 'Send it once approved', status: 'pending' },
+        ],
+      });
+      const reads: [string, string, string][] = [
+        ['get_project_context', `Reading the ${project.name} brief`, `${project.name}, 4 tasks`],
+        ['get_todays_activity', 'Reading what got done today', '1 done, 1 in progress'],
+      ];
+      for (const [tool, label, detail] of reads) {
+        onEvent({ type: 'step', step: { id: tool, tool, label, status: 'running' } });
+        await wait(700 * speed());
+        onEvent({ type: 'step', step: { id: tool, tool, label, status: 'done', detail } });
+      }
+      return {
+        text: `Here is where ${project.name} stands. Done: research five competitors. In progress: analyze findings. Still to start: build comparison spreadsheet, draft presentation.`,
+        thread: null,
+        by: 'code',
+      };
+    },
+
+    async sendUpdate(_thread, _text, approved, onEvent) {
+      await wait(300 * speed());
+      if (!approved) return;
+      onEvent({
+        type: 'step',
+        step: {
+          id: 'send_status_update',
+          tool: 'send_status_update',
+          label: `Sending the update to ${manager.name}`,
+          status: 'done',
+          detail: 'preview only, nothing was sent',
+        },
+      });
+    },
   };
 }

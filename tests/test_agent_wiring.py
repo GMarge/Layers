@@ -88,6 +88,33 @@ def main():
     tools.end_run()
     assert "artifact_id" not in scratch, "permission check failed"
     print("permission ok: Finance workflow refused")
+
+    # UPDATE: the agent drafts a status update, the harness holds it, and the person's own
+    # wording is what gets sent.
+    model.script[:] = [
+        call("write_todos", todos=[{"content": "Read the project and today's activity", "status": "in_progress"},
+                                   {"content": "Write the update", "status": "pending"},
+                                   {"content": "Send it once approved", "status": "pending"}]),
+        call("get_project_context"),
+        call("get_todays_activity"),
+        call("send_status_update", text="Research is done and analysis is in progress."),
+        AIMessage(content="Sent the update."),
+    ]
+    events.clear()
+    scratch = tools.start_run(events.append)
+    _, paused = agent.run(supervisor, "UPDATE: draft a status update and send it", "t-update")
+    assert paused, "the harness should pause before sending anything"
+    held = agent.pending_call(supervisor, "t-update")
+    assert held and held["name"] == "send_status_update", held
+    assert held["args"]["text"].startswith("Research is done"), held
+    assert not db.query("SELECT 1 FROM updates"), "nothing may be sent before approval"
+    agent.resume(supervisor, "t-update", True,
+                 {"name": "send_status_update", "args": {"text": "Research is done. Analysis is next."}})
+    tools.end_run()
+    sent = db.query("SELECT text FROM updates")
+    assert sent and sent[0]["text"] == "Research is done. Analysis is next.", sent
+    assert any(e["type"] == "plan" for e in events), "the plan should be reported"
+    print("update ok: paused with the draft, sent the edited wording ->", sent[0]["text"])
     db.reset()
 
 

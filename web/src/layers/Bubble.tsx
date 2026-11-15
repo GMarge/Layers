@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { ArrowUp, Check, Close } from '../ui/icons';
 import { manager, project, rules } from '../workspace/data';
-import { DEFAULT_NAME, type EyeStyle, type OutlineStyle } from '../lab/DesignLab';
+import { DEFAULT_NAME, type EyeStyle, type OutlineStyle } from './prefs';
 import { MascotGlyph, SHAPES, type Shape } from './Mascot';
 import type { Counters, KnowledgeItem, PolicyMode, RestMode, Scene, Signals, Step, Todo, UnsureMode } from './types';
 
@@ -17,6 +17,8 @@ export interface Prefs {
   unsureMode: UnsureMode;
   /** What the employee calls the agent. */
   name: string;
+  /** When a new direction is noticed: say so, or just put it on the map. */
+  branchMode: 'ask' | 'auto';
 }
 
 export interface BubbleActions {
@@ -50,7 +52,9 @@ export interface BubbleActions {
   leaveBranch(lineId: string): void;
   /** Open the page with the branch map. */
   openBranches(): void;
-  setPrefs(change: Partial<Pick<Prefs, 'shape' | 'eyes' | 'rest' | 'outline' | 'name'>>): void;
+  setPrefs(change: Partial<Pick<Prefs, 'shape' | 'eyes' | 'rest' | 'outline' | 'name' | 'branchMode'>>): void;
+  /** Only in the preview without a server: answer a request as the manager would. */
+  previewDecide?(approved: boolean): void;
   /** Hide the agent completely, or bring it back. */
   toggleHidden(): void;
   dismiss(): void;
@@ -264,7 +268,7 @@ function AskForm({ name, onAsk, disabled }: { name: string; onAsk: (question: st
 }
 
 /** The to-do list the agent wrote for itself before starting, in its own words. */
-function Plan({ todos }: { todos?: Todo[] }) {
+export function Plan({ todos }: { todos?: Todo[] }) {
   if (!todos || todos.length === 0) return null;
   return (
     <div className="b-plan">
@@ -281,7 +285,7 @@ function Plan({ todos }: { todos?: Todo[] }) {
 }
 
 /** Each tool call the agent made, in plain English, with the real call underneath. */
-function Steps({ steps }: { steps: Step[] }) {
+export function Steps({ steps }: { steps: Step[] }) {
   if (steps.length === 0) {
     return (
       <p className="b-wait">
@@ -636,6 +640,15 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
               ]}
               onChange={(outline) => a.setPrefs({ outline })}
             />
+            <Choice
+              label="Branches"
+              value={prefs.branchMode}
+              options={[
+                ['auto', 'Quietly'],
+                ['ask', 'Tell me'],
+              ]}
+              onChange={(branchMode) => a.setPrefs({ branchMode })}
+            />
             <p className="b-fine">
               Right-click me for the branch map, today so far, or to hide me. Right-click the same spot to bring me
               back, or press <kbd>Alt</kbd> <kbd>L</kbd>. Whatever I'm called and wherever I am, I still check each
@@ -672,6 +685,17 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
                 answers.
               </p>
               {scene.why && <p className="b-fine">{scene.why}</p>}
+              {a.previewDecide && (
+                <p className="b-fine">
+                  This preview has no manager's page, so answer as {manager.first}:{' '}
+                  <button type="button" className="b-link" onClick={() => a.previewDecide?.(true)}>
+                    Approve
+                  </button>{' '}
+                  <button type="button" className="b-link" onClick={() => a.previewDecide?.(false)}>
+                    Decline
+                  </button>
+                </p>
+              )}
             </div>
             <div className="b-actions">
               <Act hint="B" onClick={a.backToProject}>

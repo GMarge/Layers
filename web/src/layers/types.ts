@@ -96,12 +96,43 @@ export type Verdict = (
    * with what the conversation was doing. Left out when only the quick screen looked.
    */
   topic?: { id: string; label: string } | null;
+  /** Who decided: the gate's plain code, or the agent after looking. */
+  by?: 'gate' | 'agent';
 };
+
+/** Where a status update for the manager stands: being drafted, waiting on the employee, or sent. */
+export interface UpdateState {
+  phase: 'idle' | 'working' | 'draft' | 'sending' | 'sent';
+  text: string;
+  /** The paused agent run that wrote it, when there is one. */
+  thread: string | null;
+  by: 'agent' | 'code' | 'preview';
+  plan?: Todo[];
+  steps: Step[];
+  at?: number;
+}
+
+/** One piece of work Layers did, kept so the employee can see exactly what happened. */
+export interface AgentRun {
+  id: string;
+  at: number;
+  kind: 'review' | 'apply' | 'update';
+  /** What it was about, in the employee's own words. */
+  prompt: string;
+  /** agent: the DeepAgent ran. code: plain code decided, no model. preview: the scripted stand-in. */
+  by: 'agent' | 'code' | 'preview';
+  outcome: string;
+  plan?: Todo[];
+  steps: Step[];
+  ms: number;
+}
 
 export interface CheckProgress {
   /** True when the quick screen could not clear the prompt and the agent is looking at it. */
   engaged: boolean;
   note?: string;
+  /** The tool call this line is about, when the server reports it in full. */
+  step?: Step;
 }
 
 /** What Layers says back when the employee asks it something before sending. */
@@ -167,6 +198,10 @@ export interface LayersService {
   approvalStatus?(requestId: string): Promise<'pending' | 'approved' | 'declined'>;
   /** The shape of the conversation's branches, for the manager. No prompt text is in it. */
   branches?(outline: unknown): Promise<void>;
+  /** The agent drafts a status update for the manager from the day's results, and stops before sending. */
+  draftUpdate?(onEvent: (e: AgentEvent) => void): Promise<{ text: string; thread: string | null; by: 'agent' | 'code' }>;
+  /** The employee's answer to the draft: send it, in their own wording if they changed it, or drop it. */
+  sendUpdate?(thread: string | null, text: string, approved: boolean, onEvent: (e: AgentEvent) => void): Promise<void>;
 }
 
 /** What the Layers overlay is showing right now. */
