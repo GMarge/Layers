@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BranchMap } from '../branches/Map';
 import type { MapShape } from '../branches/model';
 import { EdgeGlow } from '../layers/EdgeGlow';
@@ -253,6 +253,10 @@ function describe(shape: MapShape): string {
 export function ManagerView() {
   const [data, setData] = useState<ManagerData | null>(null);
   const [offline, setOffline] = useState(false);
+  /** True when this is the sample the public preview ships, shown because no server answered. */
+  const [sample, setSample] = useState(false);
+  /** Whether the server has answered at all, and whether the sample has been fetched. */
+  const seen = useRef({ live: false, sample: false });
   const [busy, setBusy] = useState<string | null>(null);
   const [chosen, setChosen] = useState('me');
   const [showAudit, setShowAudit] = useState(false);
@@ -265,10 +269,27 @@ export function ManagerView() {
     fetch('/api/manager')
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
       .then((d: ManagerData) => {
+        seen.current = { live: true, sample: false };
+        setSample(false);
         setData(d);
         setOffline(false);
       })
-      .catch(() => setOffline(true));
+      .catch(() => {
+        // A server that was answering keeps its last page through a short gap, as before.
+        if (seen.current.live || seen.current.sample) return;
+        // No server at all: show the sample that ships with the preview, once, so clicks in it last.
+        seen.current.sample = true;
+        return fetch('/preview/manager.json')
+          .then((r) => (r.ok ? r.json() : Promise.reject(new Error('unavailable'))))
+          .then((d: ManagerData) => {
+            setData(d);
+            setSample(true);
+          })
+          .catch(() => {
+            seen.current.sample = false;
+            setOffline(true);
+          });
+      });
 
   useEffect(() => {
     void load();
@@ -277,6 +298,11 @@ export function ManagerView() {
   }, []);
 
   const decide = async (id: string, approved: boolean) => {
+    if (sample) {
+      // Nobody is waiting on the other side of a sample, so the request just leaves the list.
+      setData((d) => (d ? { ...d, pending: d.pending.filter((p) => p.id !== id) } : d));
+      return;
+    }
     setBusy(id);
     await fetch(`/api/approvals/${id}/decide`, {
       method: 'POST',
@@ -290,6 +316,10 @@ export function ManagerView() {
   /** Change a rule for the whole team. It applies from each person's next prompt. */
   const setRule = async (change: Partial<Settings>) => {
     if (!data) return;
+    if (sample) {
+      setData({ ...data, settings: { ...data.settings, ...change } });
+      return;
+    }
     const next = { ...(draft ?? data.settings), ...change };
     setDraft(next);
     await fetch('/api/settings', {
@@ -352,6 +382,13 @@ export function ManagerView() {
             Layers
           </p>
         </header>
+
+        {sample && (
+          <p className="mgr__sample" role="note">
+            This copy has no server behind it, so this page is a sample. Nothing on it is live, and what you change
+            here is not kept. With the server, it fills in as the employee works.
+          </p>
+        )}
 
         <section aria-labelledby="needs">
           <h2 id="needs">Needs you{data.pending.length > 0 && <b>{data.pending.length}</b>}</h2>
@@ -672,9 +709,11 @@ export function ManagerView() {
 
         <p className="mgr__fine">
           You see a prompt only when someone sends it to you for approval. Everything else appears as counts, outcomes
-          and the shape of the conversation. {data.team.filter((m) => !m.sample).map((m) => m.name.split(' ')[0]).join(', ')}{' '}
-          is live. Teammates marked Sample are example data, there to show how a team looks. The company and people are
-          fictional.
+          and the shape of the conversation.{' '}
+          {sample
+            ? 'Everyone on this page is example data.'
+            : `${data.team.filter((m) => !m.sample).map((m) => m.name.split(' ')[0]).join(', ')} is live. Teammates marked Sample are example data, there to show how a team looks.`}{' '}
+          The company and people are fictional.
         </p>
       </main>
       <EdgeGlow mode={data.pending.length > 0 ? 'unsure' : 'ambient'} variant="glow" quiet={false} />

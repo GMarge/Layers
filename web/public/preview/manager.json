@@ -1,0 +1,676 @@
+{
+ "manager": "Michael Scott",
+ "employee": {
+  "name": "Gavin Margerum",
+  "team": "Strategy",
+  "role": "Intern"
+ },
+ "project": {
+  "name": "Project X",
+  "title": "Competitor analysis",
+  "due": "Fri, Nov 20"
+ },
+ "pending": [
+  {
+   "id": "EX-0001",
+   "prompt": "Plan my ski vacation this weekend",
+   "note": "",
+   "reason": "Nothing in the prompt connects to the competitor analysis.",
+   "signals": {
+    "fits": [],
+    "against": [
+     "ski",
+     "vacation"
+    ]
+   },
+   "from": "Gavin Margerum",
+   "at": 1794745340.464282
+  }
+ ],
+ "feed": [
+  {
+   "ts": 1794745340.4756742,
+   "text": "Gavin sent you a status update."
+  },
+  {
+   "ts": 1794745340.4697752,
+   "text": "Gavin reused a team workflow. The result was added to Project X."
+  },
+  {
+   "ts": 1794745340.46469,
+   "text": "Gavin asked for your approval."
+  },
+  {
+   "ts": 1794745340.463422,
+   "text": "Layers held a prompt under rule AI-01."
+  }
+ ],
+ "tasks": [
+  {
+   "id": "t1",
+   "title": "Research five competitors",
+   "status": "done"
+  },
+  {
+   "id": "t2",
+   "title": "Analyze findings",
+   "status": "doing"
+  },
+  {
+   "id": "t3",
+   "title": "Build comparison spreadsheet",
+   "status": "doing"
+  },
+  {
+   "id": "t4",
+   "title": "Draft presentation",
+   "status": "todo"
+  }
+ ],
+ "counts": {
+  "checked": 4,
+  "passed": 2,
+  "held": 1,
+  "reused": 1
+ },
+ "team": [
+  {
+   "id": "me",
+   "name": "Gavin Margerum",
+   "role": "Intern",
+   "team": "Strategy",
+   "sample": true,
+   "project": {
+    "name": "Project X",
+    "title": "Competitor analysis",
+    "due": "Fri, Nov 20"
+   },
+   "tasks": [
+    {
+     "id": "t1",
+     "title": "Research five competitors",
+     "status": "done"
+    },
+    {
+     "id": "t2",
+     "title": "Analyze findings",
+     "status": "doing"
+    },
+    {
+     "id": "t3",
+     "title": "Build comparison spreadsheet",
+     "status": "doing"
+    },
+    {
+     "id": "t4",
+     "title": "Draft presentation",
+     "status": "todo"
+    }
+   ],
+   "counts": {
+    "checked": 4,
+    "passed": 2,
+    "held": 1,
+    "reused": 1
+   },
+   "pending": 1,
+   "feed": [
+    {
+     "ts": 1794745340.4756742,
+     "text": "Gavin sent you a status update."
+    },
+    {
+     "ts": 1794745340.4697752,
+     "text": "Gavin reused a team workflow. The result was added to Project X."
+    },
+    {
+     "ts": 1794745340.46469,
+     "text": "Gavin asked for your approval."
+    },
+    {
+     "ts": 1794745340.463422,
+     "text": "Layers held a prompt under rule AI-01."
+    }
+   ],
+   "branches": {
+    "lines": [
+     {
+      "id": "main",
+      "kind": "main",
+      "parent": null,
+      "fork": null,
+      "label": "Competitor research",
+      "task": "t1",
+      "merged": false,
+      "promoted": false
+     },
+     {
+      "id": "l1",
+      "kind": "explicit",
+      "parent": "main",
+      "fork": 0,
+      "label": "Analysis",
+      "task": "t2",
+      "merged": false,
+      "promoted": true
+     },
+     {
+      "id": "l2",
+      "kind": "implicit",
+      "parent": "main",
+      "fork": 2,
+      "label": "Comparison spreadsheet",
+      "task": "t3",
+      "merged": false,
+      "promoted": false
+     }
+    ],
+    "nodes": [
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1,
+      "at": 1794744440.4765491
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 1,
+      "at": 1794744560.4765491
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1,
+      "at": 1794744700.4765491
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 2,
+      "at": 1794744820.4765491
+     },
+     {
+      "line": "l2",
+      "reopened": false,
+      "visit": 1,
+      "at": 1794745040.4765491
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 3,
+      "at": 1794745220.4765491
+     }
+    ],
+    "active": "l1",
+    "stops": [
+     {
+      "line": "main",
+      "after": 2,
+      "state": "waiting",
+      "why": "policy",
+      "at": 1794744740.4765491
+     }
+    ]
+   },
+   "updates": [
+    {
+     "text": "Here is where Project X stands. Done: research five competitors. In progress: analyze findings, build comparison spreadsheet. Added to the project today: Project X competitor matrix. Still to start: draft presentation.",
+     "ts": 1794745340.4752069
+    }
+   ]
+  },
+  {
+   "id": "dwight",
+   "name": "Dwight Schrute",
+   "role": "Assistant to the Manager",
+   "team": "Strategy",
+   "sample": true,
+   "project": {
+    "name": "Project Y",
+    "title": "Customer interview synthesis",
+    "due": "Wed, Nov 25"
+   },
+   "tasks": [
+    {
+     "id": "y1",
+     "title": "Collect interview notes",
+     "status": "done"
+    },
+    {
+     "id": "y2",
+     "title": "Tag themes",
+     "status": "done"
+    },
+    {
+     "id": "y3",
+     "title": "Draft the synthesis",
+     "status": "doing"
+    },
+    {
+     "id": "y4",
+     "title": "Review with Michael",
+     "status": "todo"
+    }
+   ],
+   "counts": {
+    "checked": 14,
+    "passed": 12,
+    "held": 1,
+    "reused": 1
+   },
+   "pending": 0,
+   "feed": [
+    {
+     "text": "Layers moved a direction Dwight kept returning to into its own chat."
+    },
+    {
+     "text": "Dwight reused a team workflow. A synthesis sheet was added to Project Y."
+    },
+    {
+     "text": "Layers held a prompt under rule AI-01."
+    }
+   ],
+   "branches": {
+    "lines": [
+     {
+      "id": "main",
+      "kind": "main",
+      "parent": null,
+      "fork": null,
+      "label": "Interview notes",
+      "merged": false,
+      "promoted": false
+     },
+     {
+      "id": "l1",
+      "kind": "implicit",
+      "parent": "main",
+      "fork": 1,
+      "label": "Theme tagging",
+      "merged": true,
+      "promoted": false
+     },
+     {
+      "id": "l2",
+      "kind": "explicit",
+      "parent": "main",
+      "fork": 4,
+      "label": "Synthesis draft",
+      "merged": false,
+      "promoted": true
+     }
+    ],
+    "nodes": [
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": true,
+      "visit": 2
+     },
+     {
+      "line": "l2",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": true,
+      "visit": 3
+     },
+     {
+      "line": "l2",
+      "reopened": true,
+      "visit": 2
+     },
+     {
+      "line": "l2",
+      "reopened": false,
+      "visit": 2
+     },
+     {
+      "line": "l2",
+      "reopened": false,
+      "visit": 2
+     }
+    ],
+    "active": "l2",
+    "stops": [
+     {
+      "line": "main",
+      "after": 3,
+      "state": "held"
+     }
+    ]
+   }
+  },
+  {
+   "id": "pam",
+   "name": "Pam Beesly",
+   "role": "Office Administrator",
+   "team": "Strategy",
+   "sample": true,
+   "project": {
+    "name": "Project Z",
+    "title": "Pricing page teardown",
+    "due": "Mon, Nov 23"
+   },
+   "tasks": [
+    {
+     "id": "z1",
+     "title": "Capture competitor pricing pages",
+     "status": "done"
+    },
+    {
+     "id": "z2",
+     "title": "Compare plan tiers",
+     "status": "doing"
+    },
+    {
+     "id": "z3",
+     "title": "Write recommendations",
+     "status": "todo"
+    }
+   ],
+   "counts": {
+    "checked": 10,
+    "passed": 10,
+    "held": 0,
+    "reused": 0
+   },
+   "pending": 0,
+   "feed": [
+    {
+     "text": "Layers noticed a new direction and gave it its own line."
+    },
+    {
+     "text": "Ten prompts went straight through."
+    }
+   ],
+   "branches": {
+    "lines": [
+     {
+      "id": "main",
+      "kind": "main",
+      "parent": null,
+      "fork": null,
+      "label": "Pricing pages",
+      "merged": false,
+      "promoted": false
+     },
+     {
+      "id": "l1",
+      "kind": "implicit",
+      "parent": "main",
+      "fork": 6,
+      "label": "Plan tiers",
+      "merged": false,
+      "promoted": false
+     }
+    ],
+    "nodes": [
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "l1",
+      "reopened": false,
+      "visit": 1
+     },
+     {
+      "line": "main",
+      "reopened": true,
+      "visit": 2
+     }
+    ],
+    "active": "main",
+    "stops": []
+   }
+  }
+ ],
+ "settings": {
+  "policy_mode": "approval",
+  "unsure_mode": "ask"
+ },
+ "processes": [
+  {
+   "who": "Gavin Margerum",
+   "project": "Project X",
+   "did": "Applied CompetitorMatrix_v2 to Project X",
+   "path": [],
+   "workflow": "CompetitorMatrix_v2",
+   "workflow_id": "wf-competitor-matrix-v2",
+   "when": "today",
+   "sample": true
+  },
+  {
+   "who": "Pam Beesly",
+   "project": "Project Z",
+   "did": "Laid competitor pricing pages side by side, tier by tier",
+   "path": [
+    "Pricing pages",
+    "Plan tiers",
+    "Comparison spreadsheet"
+   ],
+   "workflow": "CompetitorMatrix_v2",
+   "workflow_id": "wf-competitor-matrix-v2",
+   "when": "2 days ago",
+   "sample": true
+  },
+  {
+   "who": "Dwight Schrute",
+   "project": "Project Y",
+   "did": "Turned twelve customer interviews into themes, then a synthesis draft",
+   "path": [
+    "Interview notes",
+    "Theme tagging",
+    "Synthesis draft"
+   ],
+   "workflow": "InterviewSynthesis_v1",
+   "workflow_id": "wf-interview-synth",
+   "when": "3 days ago",
+   "sample": true
+  },
+  {
+   "who": "Jim Halpert",
+   "project": "Loyalty study",
+   "did": "Built the readout presentation for the loyalty study from the findings",
+   "path": [
+    "Findings",
+    "Presentation outline",
+    "Readout"
+   ],
+   "workflow": "ReadoutOutline_v3",
+   "workflow_id": "wf-readout-outline-v3",
+   "when": "9 days ago",
+   "sample": true
+  },
+  {
+   "who": "Dwight Schrute",
+   "project": "Vendor renewal",
+   "did": "Compared six point-of-sale vendors side by side before a renewal",
+   "path": [
+    "Vendor shortlist",
+    "Comparison spreadsheet",
+    "Recommendation"
+   ],
+   "workflow": "CompetitorMatrix_v2",
+   "workflow_id": "wf-competitor-matrix-v2",
+   "when": "12 days ago",
+   "sample": true
+  }
+ ],
+ "rules": [
+  {
+   "id": "AI-01",
+   "name": "Assigned work only",
+   "text": "Use the company AI for work on your assigned projects."
+  },
+  {
+   "id": "AI-02",
+   "name": "Reuse before rebuild",
+   "text": "Check for an approved team workflow before generating a new one."
+  }
+ ],
+ "audit": [
+  {
+   "ts": 1794745340.4756742,
+   "who": "Layers agent",
+   "what": "called send_status_update",
+   "note": "31 words \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.4741702,
+   "who": "Layers agent",
+   "what": "called get_todays_activity",
+   "note": "1 done, 2 in progress, 1 documents \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.473428,
+   "who": "Layers agent",
+   "what": "called get_project_context",
+   "note": "Project X, 4 tasks \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.472568,
+   "who": "Gavin Margerum",
+   "what": "offered a team workflow instead",
+   "note": "not sent"
+  },
+  {
+   "ts": 1794745340.471616,
+   "who": "Layers agent",
+   "what": "called update_task_status",
+   "note": "build comparison spreadsheet: doing \u00b7 1 ms"
+  },
+  {
+   "ts": 1794745340.4697752,
+   "who": "Layers agent",
+   "what": "called create_project_artifact",
+   "note": "5 rows, 5 columns \u00b7 1 ms"
+  },
+  {
+   "ts": 1794745340.46844,
+   "who": "Layers agent",
+   "what": "called check_access",
+   "note": "shared with strategy, interns included \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.467476,
+   "who": "Gate",
+   "what": "offered a team workflow instead",
+   "note": "not sent"
+  },
+  {
+   "ts": 1794745340.4666948,
+   "who": "Layers agent",
+   "what": "called search_org_memory",
+   "note": "CompetitorMatrix_v2 \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.465808,
+   "who": "Layers agent",
+   "what": "called check_company_policy",
+   "note": "screen says reuse \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.465295,
+   "who": "Layers agent",
+   "what": "called get_project_context",
+   "note": "Project X, 4 tasks \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.46469,
+   "who": "Layers agent",
+   "what": "called request_manager_approval",
+   "note": "EX-0001 \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.463422,
+   "who": "Gate",
+   "what": "held a prompt under AI-01",
+   "note": "not sent"
+  },
+  {
+   "ts": 1794745340.4625988,
+   "who": "Layers agent",
+   "what": "called check_company_policy",
+   "note": "screen says policy \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.461962,
+   "who": "Layers agent",
+   "what": "called get_project_context",
+   "note": "Project X, 4 tasks \u00b7 0 ms"
+  },
+  {
+   "ts": 1794745340.460435,
+   "who": "Gate",
+   "what": "cleared a prompt",
+   "note": "sent on"
+  },
+  {
+   "ts": 1794745340.446932,
+   "who": "Gate",
+   "what": "cleared a prompt",
+   "note": "sent on"
+  }
+ ]
+}

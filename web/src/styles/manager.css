@@ -418,6 +418,17 @@
 }
 
 /* In the preview without a server, the manager's page is shown as pictures of the real one. */
+/* The public preview's page says what it is before anything else on it. */
+.mgr__sample {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--well);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
 .mgr__shot {
   display: block;
   width: 100%;

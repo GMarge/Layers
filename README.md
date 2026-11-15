@@ -82,7 +82,7 @@ Check everything without a key or a model run:
 
 ### A public preview
 
-**https://layers-blue.vercel.app/#intro** is the `web` folder on Vercel, with no server behind it. The workspace says so and runs as a preview: the checks, branches and screens all work, a scripted stand-in plays the agent, and answers are placeholders. The live agent needs the server, which holds a database and paused agent runs, so it runs on a machine that stays up rather than on serverless functions.
+**https://layers-blue.vercel.app/#intro** is the `web` folder on Vercel, with no server behind it. The workspace says so and runs as a preview: the checks, branches and screens all work, a scripted stand-in plays the agent, and answers are placeholders. Its manager's page shows a sample of that page, marked as one and made by `scripts/preview_manager.py` from a model-free copy of the server. The live agent needs the server, which holds a database and paused agent runs, so it runs on a machine that stays up rather than on serverless functions.
 
 To put a new build there: `cd web && npx vercel deploy --prod --yes`.
 
