@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plan, Steps } from '../layers/Bubble';
-import type { AgentRun, Counters, Task, UpdateState } from '../layers/types';
+import type { AgentRun, Counters, Memory, Task, UpdateState } from '../layers/types';
 import { Check, Close } from '../ui/icons';
 import { BranchMap } from './Map';
 import { TOPICS, chatOf, chatTitle, chatsOf, effort, openLines, shapeOf, type Tree } from './model';
@@ -24,6 +24,8 @@ interface Props {
   runs: AgentRun[];
   /** Whether the live agent is behind this workspace, in a sentence. */
   live: string;
+  /** What Layers can draw on besides this conversation. */
+  memory: Memory;
   /** The status update for the manager, wherever it stands. */
   update: UpdateState;
   managerName: string;
@@ -398,6 +400,34 @@ function Agent(p: Props) {
           your manager can approve a held prompt.
         </li>
       </ol>
+
+      <h3>What it remembers</h3>
+      <ul className="bpanel__memory">
+        <li>
+          <b>This conversation.</b> {p.tree.nodes.length} prompts on {p.tree.lines.length}{' '}
+          {p.tree.lines.length === 1 ? 'line' : 'lines'}, kept as a map. Before answering, it checks the map: a question
+          you already asked is pointed back to, not answered twice.
+        </li>
+        <li>
+          <b>Your team.</b> {p.memory.team} ways teammates did similar work, and {p.memory.workflows} approved workflows
+          you may use.
+        </li>
+        <li>
+          <b>What you taught it.</b>{' '}
+          {p.memory.learned.length > 0
+            ? `These words now count as project work: ${p.memory.learned.join(', ')}.`
+            : 'Nothing yet. When you explain how an unclear prompt connects to the project, it remembers the words.'}
+        </li>
+        {(() => {
+          const checked = p.runs.filter((r) => r.kind === 'review');
+          const spared = checked.filter((r) => r.by !== 'agent' && !r.outcome.startsWith('Cleared')).length;
+          return checked.length > 0 ? (
+            <li>
+              <b>So far.</b> {spared} of your last {checked.length} prompts needed no model call at all.
+            </li>
+          ) : null;
+        })()}
+      </ul>
 
       <h3>What the agent can do</h3>
       <ul className="bpanel__tools">

@@ -438,24 +438,37 @@ const words = (text: string) =>
  * so Layers points back to it instead of asking again. A prompt that works on the last
  * answer ("shorten this") is never a repeat.
  */
-export function findRepeat(tree: Tree, text: string): { node: PromptNode; index: number } | null {
+export function findRepeat(tree: Tree, text: string): { node: PromptNode; index: number; sure: boolean } | null {
   if (MODIFIES.test(text.trim())) return null;
+  const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const typed = plain(text);
+  if (!typed) return null;
+  // Word for word the same: no thinking needed, however short it is.
+  const exact = tree.nodes.findIndex((node) => plain(node.text) === typed);
+  if (exact >= 0) return { node: tree.nodes[exact]!, index: exact, sure: true };
+
   const mine = words(text);
-  if (mine.size < 3) return null;
+  if (mine.size < 2) return null;
   let best: { node: PromptNode; index: number } | null = null;
   let top = 0;
+  let overlap = 0;
   tree.nodes.forEach((node, index) => {
     const theirs = words(node.text);
-    if (theirs.size < 3) return;
+    if (theirs.size < 2) return;
     let shared = 0;
     for (const w of mine) if (theirs.has(w)) shared += 1;
     const alike = shared / (mine.size + theirs.size - shared);
     if (alike > top) {
       top = alike;
+      overlap = shared;
       best = { node, index };
     }
   });
-  return top >= 0.85 ? best : null;
+  if (!best) return null;
+  // Nearly the same words: sure. Some of the same words: worth a quick look by the agent.
+  if (top >= 0.85 && mine.size >= 3) return { ...(best as { node: PromptNode; index: number }), sure: true };
+  if (top >= 0.4 && overlap >= 2) return { ...(best as { node: PromptNode; index: number }), sure: false };
+  return null;
 }
 
 /** How many prompts went to each direction, biggest first. */

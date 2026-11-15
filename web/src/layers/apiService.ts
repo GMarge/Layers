@@ -1,4 +1,4 @@
-import type { AgentEvent, AskAnswer, CheckProgress, Knowledge, LayersService, Verdict } from './types';
+import type { AgentEvent, AskAnswer, CheckProgress, Knowledge, LayersService, Memory, Verdict } from './types';
 
 /**
  * The real Layers backend (FastAPI + DeepAgents), reached through the dev server's
@@ -104,9 +104,12 @@ const service: LayersService = {
       policy_mode: 'warn' | 'approval';
       unsure_mode: 'ask' | 'allow' | 'defer';
       runs?: { used: number; cap: number };
+      memory?: Memory;
     };
-    return { policyMode: s.policy_mode, unsureMode: s.unsure_mode, runs: s.runs };
+    return { policyMode: s.policy_mode, unsureMode: s.unsure_mode, runs: s.runs, memory: s.memory };
   },
+
+  same: (prompt, earlier) => post<{ same: boolean; by: 'agent' | 'code' }>('same', { new: prompt, earlier }),
 
   async approvalStatus(requestId) {
     const res = await fetch(`/api/approvals/${requestId}`);

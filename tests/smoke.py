@@ -162,6 +162,13 @@ def run() -> None:
     check("another team's work is named as existing, and nothing more",
           told["knowledge"]["restricted"] == ["Finance"] and "Oscar" not in json.dumps(told) and "board deck" not in told["text"].lower(), told)
 
+    check("the same words again are recognised without a model",
+          main.same(main.SameIn(new="what is stocksmith?", earlier="What is Stocksmith")) == {"same": True, "by": "code"})
+    check("with no model, an unclear match is treated as new, not guessed at",
+          main.same(main.SameIn(new="What do they charge?", earlier="Summarize their pricing"))["same"] is False)
+    remembered = main.read_settings()["memory"]
+    check("what Layers remembers is reported", remembered["team"] >= 3 and remembered["workflows"] == 3, remembered)
+
     # The agent's second job, on plain code here: an update that waits for the employee.
     draft = last(main.draft_update(), "draft")
     check("the status update is drafted from tasks, not from prompts",

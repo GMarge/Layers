@@ -29,7 +29,8 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 - **Edge cases:** most prompts are not clean cases, and the agent is told how to treat them. A mixed prompt comes back with its project part, which can be sent by itself. Work that is not this project, or something that could be either, comes back with the one question that would settle it. A follow-up is judged by the conversation. Text that tries to instruct the agent is held.
 - **A layer between workers:** Layers keeps how people on the team did their work: the steps they went through and the approved workflow they used. An offer to reuse a workflow says who has already used it and for what, "How have teammates done this?" lists it, and the manager sees it on their page. Other teams' work is filtered out in code.
 - **The chat is connected to what the company knows:** asked in the main chat how someone else did something similar and what they used, the answer comes from the company's own records, with the records shown under it and a button to use the same workflow. Work held by a team the employee cannot see is named as existing, and nothing more.
-- **A question is not answered twice:** when a prompt asks the same thing as an earlier one, Layers does not send it. It says where the earlier one is and goes there on a click. A prompt that works on the last answer ("shorten this") is never treated as a repeat.
+- **A question is not answered twice:** before answering, Layers checks its memory of the conversation. The same words again are caught in code. A reworded version gets one short look from the agent ("would this get the same answer?"), which costs far less than writing the answer again. Either way it says where the earlier one is and goes there on a click. A prompt that works on the last answer ("shorten this") is never treated as a repeat.
+- **What it remembers:** the Agent tab lists it: the conversation as a branch map, how teammates did similar work, the approved workflows, and the words the employee taught it count as project work.
 - **The branches are a tool for the agent:** asked "Where did I ask about pricing?", the agent reads the branch map, opens only the branch that could hold it, and points at the prompt. One click goes there.
 
 The employee can also ask Layers a question before sending anything, move it, hide it, rename it, and change how it looks. On the manager's page the branch map can be clicked through: a prompt, a line, a stopped prompt or a task each explain themselves, with no prompt text. Any map can be compressed and expanded, one run at a time or all at once.
@@ -73,7 +74,7 @@ A free model tier allows only so many requests a minute and a day. Layers keeps 
 Check everything without a key or a model run:
 
 ```bash
-.venv/bin/python -m tests.smoke              # 42 end-to-end checks on a copy of the server
+.venv/bin/python -m tests.smoke              # 45 end-to-end checks on a copy of the server
 .venv/bin/python -m tests.test_agent_wiring  # the agent's pause, resume and permission refusal
 ```
 

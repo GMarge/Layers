@@ -38,6 +38,12 @@ def chat_model(name: str):
     return init_chat_model(name, max_retries=1, timeout=45)
 
 
+def answering_model():
+    """The model for a single question and answer, with the second model standing by."""
+    model = chat_model(MODEL)
+    return model.with_fallbacks([chat_model(FALLBACK)]) if FALLBACK else model
+
+
 SYSTEM_PROMPT = f"""You are Layers, the management layer on a company's AI workspace.
 
 You act for one employee: {db.EMPLOYEE['name']}, {db.EMPLOYEE['role']} on the {db.EMPLOYEE['team']} team.

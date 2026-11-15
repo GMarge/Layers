@@ -35,6 +35,16 @@ export interface KnowledgeItem {
   usedBy?: { who: string; project: string }[];
 }
 
+/** What Layers can draw on besides the conversation in front of it. */
+export interface Memory {
+  /** Ways teammates did similar work that this employee may see. */
+  team: number;
+  /** Approved workflows this employee may use. */
+  workflows: number;
+  /** Words the employee taught it count as project work. */
+  learned: string[];
+}
+
 /** The company's own records that bear on a question: who did similar work, and what they used. */
 export interface Knowledge {
   processes: TeamProcess[];
@@ -242,7 +252,14 @@ export interface LayersService {
   /** Tell the server what the company has chosen. The server enforces it. */
   sync?(settings: { policyMode: PolicyMode; unsureMode: UnsureMode }): Promise<void>;
   /** What the company has chosen, as the server has it. The manager can change it. */
-  settings?(): Promise<{ policyMode: PolicyMode; unsureMode: UnsureMode; runs?: { used: number; cap: number } }>;
+  settings?(): Promise<{
+    policyMode: PolicyMode;
+    unsureMode: UnsureMode;
+    runs?: { used: number; cap: number };
+    memory?: Memory;
+  }>;
+  /** The thinking step before an answer: would this prompt get the same answer as an earlier one? */
+  same?(prompt: string, earlier: string): Promise<{ same: boolean; by: 'agent' | 'code' }>;
   reset?(): Promise<void>;
   /** Where an approval request stands, so the employee's side updates when the manager answers. */
   approvalStatus?(requestId: string): Promise<'pending' | 'approved' | 'declined'>;

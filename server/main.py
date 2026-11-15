@@ -277,7 +277,12 @@ def company_settings() -> dict:
 def read_settings():
     """What the company has chosen. Every workspace reads this and follows it. It also says
     how many of today's model runs are used, so the workspace can say so before they run out."""
-    return {**company_settings(), "runs": agent.usage()}
+    return {**company_settings(), "runs": agent.usage(), "memory": {
+        # What Layers can draw on besides the conversation in front of it.
+        "team": len([p for p in tools.team_processes() if p["who"] != db.EMPLOYEE["name"]]),
+        "workflows": len([w for w in db.query("SELECT * FROM workflows") if tools._can_use(w)]),
+        "learned": [r["term"] for r in db.query("SELECT term FROM learned_terms ORDER BY created_at")][:12],
+    }}
 
 
 @app.post("/api/settings")
@@ -824,10 +829,7 @@ def chat(body: ChatIn):
         agent.spend_run()
         CHAT.append({"role": "user", "content": prompt})
         seen = [t.model_dump() for t in body.context] if body.context is not None else CHAT[-24:-1]
-        model = agent.chat_model(agent.MODEL)
-        if agent.FALLBACK:  # the second free model answers if the first is throttled or used up
-            model = model.with_fallbacks([agent.chat_model(agent.FALLBACK)])
-        reply = model.invoke(
+        reply = agent.answering_model().invoke(
             [{"role": "system", "content": WORKSPACE_PROMPT + (knowledge_brief(known) if known else "")},
              *seen, {"role": "user", "content": prompt}])
         text = reply.content
@@ -845,6 +847,44 @@ def chat(body: ChatIn):
         if known:
             return {"text": knowledge_answer(known), "placeholder": False, **extra}
         return {"text": "Layers cleared this prompt, but the workspace model did not answer.", "placeholder": True}
+
+
+class SameIn(BaseModel):
+    new: str = Prompt
+    earlier: str = Prompt
+
+
+SAME_PROMPT = ("Two prompts from one conversation. Answer with a single word. Say 'same' if answering the "
+               "second would repeat the answer to the first. Say 'different' if it asks for anything new, "
+               "for more detail, or for a change to an earlier answer.")
+
+
+@app.post("/api/same")
+def same(body: SameIn):
+    """The thinking step before an answer: has this already been asked? Plain code settles the
+    plain cases. The model is asked only about the unclear ones, and only this one short
+    question, which costs far less than writing the whole answer again."""
+    def squash(text: str) -> str:
+        return " ".join(re.sub(r"[^a-z0-9]+", " ", text.lower()).split())
+
+    if squash(body.new) == squash(body.earlier):
+        return {"same": True, "by": "code"}
+    if not agent.MODEL:
+        return {"same": False, "by": "code"}
+    try:
+        agent.spend_run()
+        reply = agent.answering_model().invoke([
+            {"role": "system", "content": SAME_PROMPT},
+            {"role": "user", "content": f"First: {body.earlier}\nSecond: {body.new}"}])
+        text = reply.content
+        if isinstance(text, list):
+            text = "".join(part.get("text", "") for part in text if isinstance(part, dict))
+        said = str(text).strip().lower().startswith("same")
+        db.audit("layers-agent", "memory_check", {"same": said})
+        return {"same": said, "by": "agent"}
+    except Exception as exc:
+        db.audit("server", "agent_failed", str(exc))
+        return {"same": False, "by": "code"}
 
 
 @app.get("/api/approvals/{request_id}")
@@ -1055,6 +1095,9 @@ def audit_trail(limit: int = 40) -> list[dict]:
             what = "undid a reused workflow"
         elif action == "ask":
             what, note = "asked Layers a question", "question not shown"
+        elif action == "memory_check":
+            what = "checked whether a prompt was already asked"
+            note = "it was, so it was not answered again" if info.get("same") else "it was new"
         elif action == "blocked_send":
             what = "blocked a send with no clearing decision"
         elif action in ("error", "agent_failed", "chat_failed"):

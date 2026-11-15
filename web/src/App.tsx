@@ -36,6 +36,7 @@ import type {
   AgentEvent,
   AgentRun,
   Counters,
+  Memory,
   Hold,
   KnowledgeItem,
   Message,
@@ -272,15 +273,18 @@ export default function App({ active = true }: { active?: boolean }) {
   const quietUntil = useRef(0);
   /** How many of today's model runs are used, as the server counts them. */
   const [usage, setUsage] = useState<{ used: number; cap: number } | null>(null);
+  /** What Layers can draw on besides this conversation, as the server reports it. */
+  const [memory, setMemory] = useState<Memory | null>(null);
   useEffect(() => {
     if (!active || !service.settings) return;
     const read = service.settings;
     let live = true;
     const pull = () =>
       void read()
-        .then(({ runs: spent, ...s }) => {
+        .then(({ runs: spent, memory: remembered, ...s }) => {
           if (!live) return;
           if (spent) setUsage((u) => (u && u.used === spent.used && u.cap === spent.cap ? u : spent));
+          if (remembered) setMemory((m) => (JSON.stringify(m) === JSON.stringify(remembered) ? m : remembered));
           if (Date.now() < quietUntil.current) return;
           const before = known.current;
           known.current = s;
@@ -517,9 +521,24 @@ export default function App({ active = true }: { active?: boolean }) {
     const now = sceneRef.current.name;
     if (!prompt || now === 'checking' || now === 'working') return;
 
-    // The same question, already asked: it would get the same answer, so point back to it.
+    // Think before answering: has this been asked already? Plain code settles the plain cases.
+    // When it is only similar, the agent takes one short look, which costs far less than
+    // writing the whole answer again.
     const earlier = again ? null : findRepeat(treeRef.current, prompt);
-    if (earlier) {
+    let judged = false;
+    if (earlier && !earlier.sure) {
+      const check = (await reach()).same;
+      let same = false;
+      if (check) {
+        const asking = ++run.current;
+        setScene({ name: 'checking', engaged: true, note: 'Checking whether you already asked this' });
+        same = await check(prompt, earlier.node.text).then((said) => ((judged = said.by === 'agent'), said.same), () => false);
+        if (asking !== run.current) return;
+      }
+      if (!same) earlier.sure = false;
+      else earlier.sure = true;
+    }
+    if (earlier?.sure) {
       ++run.current;
       const where = titleOf(earlier.node.line);
       setHold({ kind: 'reuse', label: 'Not sent. You asked this before.' });
@@ -527,9 +546,11 @@ export default function App({ active = true }: { active?: boolean }) {
       logRun({
         kind: 'review',
         prompt,
-        by: backendRef.current ? 'code' : 'preview',
-        outcome: `Same question as prompt ${earlier.index + 1} in ${where}. Pointed back to it instead of asking again.`,
-        steps: [],
+        by: !backendRef.current ? 'preview' : judged ? 'agent' : 'code',
+        outcome: `Same question as prompt ${earlier.index + 1} in ${where}. Pointed back to it instead of answering again.`,
+        steps: judged
+          ? [{ id: 'memory', tool: 'memory_check', label: 'Checking whether this was already asked', status: 'done', detail: 'same question' }]
+          : [],
         ms: 0,
       });
       return;
@@ -1385,6 +1406,7 @@ export default function App({ active = true }: { active?: boolean }) {
           tasks={tasks}
           counters={counters}
           runs={runs}
+          memory={memory ?? { team: 3, workflows: 2, learned: [] }}
           update={update}
           managerName={manager.first}
           onDraftUpdate={() => void draftUpdate()}
