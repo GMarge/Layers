@@ -38,7 +38,7 @@ The free key allows **15 model requests a minute and 500 a day** for the main mo
 
 ## At the table
 
-1. Start the two servers (the commands are in the README) and open `http://localhost:5173/#intro`. That is the **How it works** screen: leave it up between demos. It loops through six example prompts by itself.
+1. Run `~/layers/scripts/demo.sh`. It starts whatever is not already running, says whether the live agent is on, and opens `http://localhost:5173/#intro`. That is the **How it works** screen: leave it up between demos. It loops through six example prompts by itself.
 2. Click **Start the live demo**, or press Enter. The dark bar pops in at the top: use **Try it** there for one-click examples. On a copy with no server, such as the Vercel link, the button reads "Try the live demo" and the workspace it opens says its answers are placeholders.
 3. Click **Refresh** in the top bar before the next person. **Try it**, then **How it works**, goes back to the first screen.
 
