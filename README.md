@@ -4,7 +4,7 @@ An intelligent management layer for a company's AI workspace. AI does the work; 
 
 Built at HackPrinceton, November 13 to 15, 2026. Track: Business and Enterprise.
 
-![A prompt held, with the rule and the words that triggered it](docs/shots/02-held-with-the-reason.jpg)
+![How a prompt moves through Layers: the gate, the agent, a person, the work](docs/shots/00-how-it-works.jpg)
 
 More pictures, all taken from a real session with the live agent, are in [docs/shots](docs/shots). The submission text and pitch are in [docs/DEVPOST.md](docs/DEVPOST.md).
 

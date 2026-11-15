@@ -97,6 +97,13 @@ async def session(ws) -> None:
 
     await call("Page.enable")
     await call("Emulation.setDeviceMetricsOverride", width=1440, height=900, deviceScaleFactor=2, mobile=False)
+    if os.environ.get("LAYERS_SHOTS_ONLY") == "intro":
+        await call("Page.navigate", url=URL + "#intro")
+        await asyncio.sleep(float(os.environ.get("LAYERS_SHOTS_WAIT", "5")))
+        picture = await call("Page.captureScreenshot", format="jpeg", quality=90)
+        (OUT / "00-how-it-works.jpg").write_bytes(base64.b64decode(picture["data"]))
+        print("saved 00-how-it-works", flush=True)
+        return
     await call("Page.navigate", url=URL)
     await asyncio.sleep(3)
     await js(HELPERS)

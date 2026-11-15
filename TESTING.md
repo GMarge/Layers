@@ -36,6 +36,12 @@ The free key allows **15 model requests a minute and 500 a day** for the main mo
 - See what is left at aistudio.google.com/rate-limit, under "Rate limits by model".
 - If the page ever says "scripted preview", the server is not answering. Start it, and the page switches to the live agent by itself within a few seconds.
 
+## At the table
+
+1. Start the two servers (the commands are in the README) and open `http://localhost:5173/#intro`. That is the **How it works** screen: leave it up between demos. It loops through six example prompts by itself.
+2. Click **Start the live demo**. Use **Try it** in the top bar for one-click examples.
+3. Click **Refresh** in the top bar before the next person.
+
 ## By hand
 
 ### The gate

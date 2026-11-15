@@ -26,6 +26,7 @@ export const TRY_PROMPTS: TryItem[] = [
 ];
 
 export const TRY_OPEN: TryItem[] = [
+  { id: 'intro', label: 'How it works', hint: 'The screen to leave up between demos' },
   { id: 'ask', label: 'Ask Layers', hint: 'A question before sending' },
   { id: 'settings', label: 'Settings', hint: 'Name, look, where it waits' },
   { id: 'branches', label: 'Branch map', hint: 'The conversation, drawn' },

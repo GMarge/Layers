@@ -1,0 +1,340 @@
+/* The screen to leave up between demos: how a prompt moves through Layers. */
+
+.intro {
+  display: grid;
+  align-content: center;
+  gap: clamp(20px, 3.4vh, 36px);
+  width: min(1180px, 100%);
+  height: 100dvh;
+  margin: 0 auto;
+  padding: 72px 32px 36px;
+  overflow-y: auto;
+}
+
+.intro p,
+.intro h1,
+.intro h2,
+.intro ol,
+.intro ul {
+  margin: 0;
+}
+
+.intro__head {
+  display: grid;
+  gap: 10px;
+}
+
+.intro__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  font-weight: 640;
+  font-stretch: var(--w-wide);
+  color: var(--agent-ink);
+}
+
+.intro__brand .glyph {
+  width: 34px;
+  height: 34px;
+}
+
+.intro h1 {
+  font-size: clamp(30px, 4.2vw, 54px);
+  font-weight: 680;
+  font-stretch: var(--w-wide);
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.intro h1 span {
+  color: var(--agent);
+}
+
+.intro__sub {
+  max-width: 68ch;
+  font-size: clamp(15px, 1.25vw, 18px);
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+/* The flow: one prompt, five stages, lit in order. */
+
+.intro__flow {
+  display: grid;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--shadow-bubble);
+}
+
+.intro__prompt {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-height: 1.5em;
+  font-size: clamp(17px, 1.6vw, 22px);
+  font-weight: 560;
+  animation: land 420ms var(--ease-out);
+}
+
+.intro__prompt span {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 460;
+  color: var(--ink-3);
+}
+
+.intro__stages {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.intro__stages li {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-height: 150px;
+  padding: 14px 14px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: 16px;
+  background: var(--canvas);
+  transition:
+    border-color var(--t-med),
+    background var(--t-med),
+    opacity var(--t-med),
+    transform var(--t-med) var(--ease-out);
+}
+
+/* The line into each stage from the one before it. */
+.intro__stages li + li::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  width: 22px;
+  height: 2px;
+  margin-right: 1.5px;
+  background: var(--line-strong);
+  transition: background var(--t-med);
+}
+
+.intro__stages li[data-skip] {
+  opacity: 0.42;
+}
+
+.intro__stages li[data-tone] {
+  background: var(--surface);
+  transform: translateY(-3px);
+}
+
+.intro__stages li[data-tone='go'] {
+  border-color: var(--agent);
+}
+
+.intro__stages li[data-tone='ask'] {
+  border-color: var(--layer-orange);
+}
+
+.intro__stages li[data-tone='stop'] {
+  border-color: var(--layer-red);
+}
+
+.intro__stages li[data-tone='go']::before {
+  background: var(--agent);
+}
+
+.intro__stages li[data-tone='ask']::before {
+  background: var(--layer-orange);
+}
+
+.intro__stages li[data-tone='stop']::before {
+  background: var(--layer-red);
+}
+
+.intro__kind {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+.intro__stages h2 {
+  font-size: 16.5px;
+  font-weight: 650;
+  font-stretch: var(--w-wide);
+}
+
+.intro__does {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+/* What this stage did with this prompt. */
+.intro__says {
+  align-self: end;
+  min-height: 2.7em;
+  padding-top: 6px;
+  font-size: 13px;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.intro__stages li[data-tone='go'] .intro__says {
+  color: var(--agent-ink);
+}
+
+.intro__stages li[data-tone='ask'] .intro__says {
+  color: #9a5a00;
+}
+
+.intro__stages li[data-tone='stop'] .intro__says {
+  color: #b3261a;
+}
+
+.intro__line {
+  min-height: 2.9em;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  opacity: 0;
+  transition: opacity var(--t-med);
+  text-wrap: pretty;
+}
+
+.intro__line[data-on] {
+  opacity: 1;
+}
+
+.intro__dots {
+  display: flex;
+  gap: 6px;
+}
+
+.intro__dots button {
+  width: 22px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--line-strong);
+  transition:
+    width var(--t-med) var(--ease-out),
+    background var(--t-med);
+}
+
+.intro__dots button[aria-pressed='true'] {
+  width: 44px;
+  background: var(--ink);
+}
+
+/* What it remembers. */
+
+.intro__memory ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 22px;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+.intro__memory b {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 640;
+  color: var(--ink);
+}
+
+.intro__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+
+.intro__start {
+  display: inline-grid;
+  place-items: center;
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 14px;
+  background: var(--agent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 640;
+  text-decoration: none;
+  transition: background var(--t-fast);
+}
+
+.intro__start:hover {
+  background: var(--agent-press);
+}
+
+.intro__more {
+  font-size: 14.5px;
+  font-weight: 560;
+  color: var(--ink);
+}
+
+.intro__foot p {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.intro :focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .intro {
+    align-content: start;
+    padding: 64px 16px 24px;
+  }
+
+  .intro__stages {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .intro__stages li {
+    min-height: 0;
+  }
+
+  .intro__stages li + li::before {
+    top: auto;
+    right: auto;
+    bottom: 100%;
+    left: 24px;
+    width: 2px;
+    height: 14px;
+    margin: 0 0 1.5px;
+  }
+
+  .intro__memory ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .intro__foot p {
+    margin-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intro__stages li,
+  .intro__prompt,
+  .intro__line {
+    animation: none;
+    transition: none;
+  }
+}

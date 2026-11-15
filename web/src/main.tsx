@@ -8,13 +8,16 @@ import './styles/layers.css';
 import './styles/branches.css';
 import './styles/bubble-extra.css';
 import App from './App';
+import { Intro } from './intro/Intro';
 import { ManagerView } from './manager/ManagerView';
 import './styles/manager.css';
+import './styles/intro.css';
 import { TRY_EVENT, TRY_OPEN, TRY_PROMPTS, type TryItem } from './workspace/tries';
 
-type View = 'employee' | 'manager' | 'both';
+type View = 'employee' | 'manager' | 'both' | 'intro';
 
-const viewOf = (hash: string): View => (hash === '#manager' ? 'manager' : hash === '#both' ? 'both' : 'employee');
+const viewOf = (hash: string): View =>
+  hash === '#manager' ? 'manager' : hash === '#both' ? 'both' : hash === '#intro' ? 'intro' : 'employee';
 const embedded = window.self !== window.top;
 
 const VIEWS: [View, string, string][] = [
@@ -46,12 +49,16 @@ function TryMenu({ view }: { view: View }) {
 
   const play = (id: string) => {
     setOpen(false);
+    if (id === 'intro') {
+      window.location.hash = '#intro';
+      return;
+    }
     const fire = () => {
       // Side by side, the workspace is the frame on the left.
       const frame = document.querySelector<HTMLIFrameElement>('.split iframe');
       (frame?.contentWindow ?? window).dispatchEvent(new CustomEvent(TRY_EVENT, { detail: id }));
     };
-    if (view === 'manager') {
+    if (view === 'manager' || view === 'intro') {
       window.location.hash = '';
       setTimeout(fire, 300);
     } else fire();
@@ -132,6 +139,7 @@ function Root() {
         <App active={view === 'employee'} />
       </div>
       {view === 'manager' && <ManagerView />}
+      {view === 'intro' && <Intro />}
       {view === 'both' && (
         <div className="split">
           <iframe title="Employee workspace" src="/" />
