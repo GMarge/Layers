@@ -142,7 +142,12 @@ export function AgentCluster(props: Props) {
     };
   }, [inBox, anchor, reducedMotion]);
 
-  const [target, setTarget] = useState<Point>(dockPoint);
+  // Place the mascot at its real initial anchor. Starting at the dock and then
+  // flying into the composer made a resting agent visibly jump on page load.
+  const [target, setTarget] = useState<Point>(() => {
+    if (anchor === 'composer' || anchor === 'absorbed' || anchor === 'hidden') return composerPoint();
+    return home ? clampToView(home) : dockPoint();
+  });
   const arrived = useSpringPosition(clusterRef, target, reducedMotion || anchor === 'drag');
 
   const onReserve = useRef(props.onReserveChange);
@@ -155,6 +160,9 @@ export function AgentCluster(props: Props) {
       const bubbleHeight = bubbleRef.current?.offsetHeight ?? 0;
       let next: Point;
       if (anchor === 'drag' && drag) next = drag;
+      // Stay connected to the chat-box pool until the emerge animation finishes;
+      // otherwise the spring can fly away while the character is still forming.
+      else if (emerging) next = absorbedPoint();
       else if (anchor === 'composer') next = composerPoint();
       else if (anchor === 'absorbed' || anchor === 'hidden') next = absorbedPoint();
       else next = home ? clampToView(home) : dockPoint();
