@@ -6,7 +6,8 @@ export type Mood = 'idle' | 'checking' | 'alert' | 'found' | 'waiting' | 'workin
 
 /** out: a floating character. in: melted into the chat box, eyes showing. gone: fully hidden. */
 export type Presence = 'out' | 'in' | 'gone';
-type Phase = Presence | 'sinking' | 'rising';
+/** plucked: pulled straight out of the chat box by a drag, with no time to rise. */
+type Phase = Presence | 'sinking' | 'rising' | 'plucked';
 
 /**
  * Silhouettes on a 64 x 64 grid. To change the character, edit or add an entry:
@@ -44,6 +45,7 @@ const UNDER = ['var(--layer-orange)', 'var(--layer-red)', 'var(--layer-pink)'];
 const TAP_SLOP = 9;
 
 const SINK_MS = 800;
+const PLUCK_MS = 380;
 /** Height of the eyes, in the mascot's 64px box, while they sit on the chat box. */
 const NIB_EYE_Y = 71.5;
 
@@ -90,6 +92,8 @@ export function Mascot(props: Props) {
   // Melting into the chat box and forming out of it are played as their own phases,
   // so the liquid animation always runs start to finish.
   const [phase, setPhase] = useState<Phase>(presence);
+  const risingRef = useRef(props.rising);
+  risingRef.current = props.rising;
   const settled = useRef(presence);
   useEffect(() => {
     const from = settled.current;
@@ -99,9 +103,19 @@ export function Mascot(props: Props) {
       if (reducedMotion) setPhase(presence);
       return;
     }
-    if (from !== 'out' || reducedMotion) {
+    if (reducedMotion) {
       setPhase(presence);
       return;
+    }
+    if (from !== 'out') {
+      if (presence !== 'out' || risingRef.current) {
+        setPhase(presence);
+        return;
+      }
+      // Dragged out of the box: grow into shape under the pointer, then let the layers fall out.
+      setPhase('plucked');
+      const timer = setTimeout(() => setPhase('out'), PLUCK_MS);
+      return () => clearTimeout(timer);
     }
     setPhase('sinking');
     const timer = setTimeout(() => setPhase(presence), SINK_MS);
