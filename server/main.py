@@ -73,8 +73,15 @@ def topic_of(said: dict | None, current: str = "") -> tuple[bool, dict | None]:
     return True, {"id": "x-" + "-".join(words), "label": " ".join(words).capitalize()}
 
 
+def task_for(workflow_id: str) -> str:
+    """The project task a workflow moves along when it is applied."""
+    row = tools._workflow_row(workflow_id)
+    return tools.plan_of(row)["task"] if row else "t3"
+
+
 def act_task(workflow_id: str) -> str:
-    return (f"ACT: apply workflow {workflow_id} to {db.PROJECT['name']} for the employee.")
+    return (f"ACT: apply workflow {workflow_id} to {db.PROJECT['name']} for the employee. "
+            f"The task it moves along is {task_for(workflow_id)}.")
 
 Prompt = Field(min_length=1, max_length=4000)
 
@@ -123,6 +130,8 @@ class FeedbackIn(BaseModel):
 class SettingsIn(BaseModel):
     policy_mode: Literal["warn", "approval"]
     unsure_mode: Literal["ask", "allow", "defer"]
+    # Who changed it: the manager from their page, or the design lab on the demo workspace.
+    actor: Literal["manager", "lab"] = "lab"
 
 
 class UndoIn(BaseModel):
@@ -200,12 +209,25 @@ def reset():
     return {"ok": True}
 
 
+def company_settings() -> dict:
+    return {"policy_mode": db.setting("policy_mode") or "approval",
+            "unsure_mode": db.setting("unsure_mode") or "ask"}
+
+
+@app.get("/api/settings")
+def read_settings():
+    """What the company has chosen. Every workspace reads this and follows it."""
+    return company_settings()
+
+
 @app.post("/api/settings")
 def settings(body: SettingsIn):
-    for key, value in body.model_dump().items():
-        db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, value))
-    db.audit("company", "settings", body.model_dump())
-    return {"ok": True}
+    chosen = {"policy_mode": body.policy_mode, "unsure_mode": body.unsure_mode}
+    if chosen != company_settings():
+        for key, value in chosen.items():
+            db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, value))
+        db.audit(db.MANAGER if body.actor == "manager" else "design-lab", "settings", chosen)
+    return {"ok": True, **chosen}
 
 
 @app.post("/api/preflight")
@@ -350,22 +372,26 @@ def apply(body: ApplyIn):
                 if not scratch.get("access_ok"):
                     return {"type": "error", "message": "You do not have access to that workflow."}
                 tools.create_project_artifact(body.workflow_id)
-            if "task_id" not in scratch:
-                tools.update_task_status("t3", "doing")
+            task_id = task_for(body.workflow_id)
+            if scratch.get("task_id") != task_id:
+                tools.update_task_status(task_id, "doing")
             if "artifact_id" not in scratch:
-                return {"type": "error", "message": "The sheet could not be created."}
+                return {"type": "error", "message": "It could not be created."}
 
             art = db.query("SELECT * FROM artifacts WHERE id = ?", (scratch["artifact_id"],))[0]
+            plan = tools.plan_of(tools._workflow_row(body.workflow_id))
+            rows = json.loads(art["rows"])
+            task = db.query("SELECT title FROM tasks WHERE id = ?", (task_id,))[0]["title"]
+            filled = (f"Its {len(rows)} sections are laid out and ready to fill in." if plan["rows"]
+                      else f"The {len(rows)} competitors from this project are filled in.")
             policy.record(body.prompt, "reuse", False, "Reused a team workflow instead of sending.", "employee")
             return {
                 "type": "result",
-                "summary": f"Comparison sheet added to {db.PROJECT['name']}.",
-                "detail": f"The {len(db.COMPETITORS)} competitors from this project are filled in. "
-                          '"Build comparison spreadsheet" is now in progress.',
-                "taskId": "t3",
+                "summary": f"{plan['noun']} added to {db.PROJECT['name']}.",
+                "detail": f'{filled} "{task}" is now in progress.',
+                "taskId": task_id,
                 "artifact": {"id": art["id"], "title": art["title"], "source": art["source"],
-                             "author": art["author"], "columns": json.loads(art["columns"]),
-                             "rows": json.loads(art["rows"])},
+                             "author": art["author"], "columns": json.loads(art["columns"]), "rows": rows},
             }
         finally:
             tools.end_run()
@@ -612,7 +638,7 @@ def manager():
     for a in db.query("SELECT ts, actor, action, detail FROM audit ORDER BY id DESC LIMIT 200"):
         action, text = a["action"], None
         if action == "tool:create_project_artifact":
-            text = f"{first} reused a team workflow. A comparison sheet was added to {db.PROJECT['name']}."
+            text = f"{first} reused a team workflow. The result was added to {db.PROJECT['name']}."
         elif action == "tool:request_manager_approval":
             text = f"{first} asked for your approval."
         elif action == "decision:manager-approved":
@@ -629,6 +655,8 @@ def manager():
             text = f"{first} sent a prompt after a warning. It is logged as an exception."
         elif action == "undo":
             text = f"{first} undid a reused workflow."
+        elif action == "settings" and a["actor"] == db.MANAGER:
+            text = "You changed the workspace rules."
         if text:
             feed.append({"ts": a["ts"], "text": text})
 
@@ -652,7 +680,62 @@ def manager():
         "manager": db.MANAGER, "employee": db.EMPLOYEE, "project": db.PROJECT,
         "pending": pending, "feed": feed[:12], "tasks": tasks, "counts": counts,
         "team": [live, *SAMPLE_TEAM],
+        "settings": company_settings(),
+        "rules": db.query("SELECT id, name, text FROM rules"),
+        "audit": audit_trail(),
     }
+
+
+ACTORS = {"layers-agent": "Layers agent", "gate": "Gate", "agent": "Layers agent", "harness": "Harness",
+          "server": "Server", "employee": db.EMPLOYEE["name"], "design-lab": "Design lab"}
+VERDICTS = {"pass": "cleared a prompt", "policy": "held a prompt under AI-01", "unsure": "could not tell, and asked",
+            "reuse": "offered a team workflow instead", "manager-approved": "approved a request",
+            "manager-declined": "declined a request", "employee-override": "sent after a warning",
+            "employee-related": "said a prompt is project work", "employee-note": "sent with a reason",
+            "employee-unsure-allowed": "sent an unclear prompt, logged", "employee-skipped-reuse": "skipped a team workflow"}
+
+
+def audit_trail(limit: int = 40) -> list[dict]:
+    """The audit log as the manager may read it: who did what, when, and how long it took.
+    What the employee typed is left out of every row."""
+    rows = []
+    for a in db.query("SELECT ts, actor, action, detail FROM audit ORDER BY id DESC LIMIT ?", (limit * 2,)):
+        action = a["action"]
+        try:
+            detail = json.loads(a["detail"])
+        except ValueError:
+            detail = a["detail"]
+        info = detail if isinstance(detail, dict) else {}
+        what, note = "", ""
+        if action.startswith("tool:"):
+            what = f"called {action[5:]}"
+            # A verdict's direction can echo the prompt, so only the verdict itself is kept.
+            said = str(info.get("detail", "")).split(",")[0] if action == "tool:submit_verdict" else info.get("detail", "")
+            note = " · ".join(str(part) for part in (said, f"{info.get('ms', 0)} ms") if part != "")
+        elif action.startswith("decision:"):
+            what = VERDICTS.get(action[9:], action[9:])
+            note = "sent on" if info.get("allowed") else "not sent"
+        elif action == "plan":
+            what, note = "wrote its plan", f"{len(detail) if isinstance(detail, list) else 0} steps"
+        elif action == "settings":
+            what = "changed the rules"
+            note = f"off-project: {info.get('policy_mode')}, unsure: {info.get('unsure_mode')}"
+        elif action == "paused_for_approval":
+            what, note = "paused the agent before it created anything", str(info.get("workflow", ""))
+        elif action == "approved_paused_action":
+            what, note = "approved the paused action", str(info.get("workflow", ""))
+        elif action == "undo":
+            what = "undid a reused workflow"
+        elif action == "ask":
+            what, note = "asked Layers a question", "question not shown"
+        elif action == "blocked_send":
+            what = "blocked a send with no clearing decision"
+        elif action in ("error", "agent_failed", "chat_failed"):
+            what, note = action.replace("_", " "), "see the server log"
+        else:
+            continue
+        rows.append({"ts": a["ts"], "who": ACTORS.get(a["actor"], a["actor"]), "what": what, "note": note})
+    return rows[:limit]
 
 
 @app.get("/api/audit")

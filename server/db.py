@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT NOT NULL, stat
 CREATE TABLE IF NOT EXISTS rules (id TEXT PRIMARY KEY, name TEXT, text TEXT, owner TEXT, scope TEXT);
 CREATE TABLE IF NOT EXISTS workflows (
   id TEXT PRIMARY KEY, name TEXT, kind TEXT, summary TEXT, author TEXT, team TEXT,
-  reviewed_on TEXT, approved_by TEXT, access TEXT, columns TEXT, inputs TEXT, shared_with TEXT
+  reviewed_on TEXT, approved_by TEXT, access TEXT, columns TEXT, inputs TEXT, shared_with TEXT,
+  plan TEXT
 );
 CREATE TABLE IF NOT EXISTS artifacts (
   id TEXT PRIMARY KEY, title TEXT, source TEXT, author TEXT, columns TEXT, rows TEXT, created_at REAL
@@ -101,29 +102,46 @@ def reset() -> None:
              "Check for an approved team workflow before generating a new one.",
              MANAGER, "Applies to this workspace only"),
         ])
-        _conn.executemany("INSERT INTO workflows VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
+        # plan: what applying the workflow makes, which task it moves, and its first column.
+        # rows of None means one row per competitor in the project.
+        _conn.executemany("INSERT INTO workflows VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             ("wf-competitor-matrix-v2", "CompetitorMatrix_v2", "Approved workflow",
              "Comparison sheet with scoring columns for up to ten competitors.",
              "Marcus Bell", "Strategy", "Oct 28, 2026", MANAGER,
              "Shared with Strategy, interns included",
              json.dumps(["Company", "Segment", "Pricing model", "Standout feature", "Gap we can use"]),
-             "A list of competitor names", json.dumps(["Strategy"])),
+             "A list of competitor names", json.dumps(["Strategy"]),
+             json.dumps({"task": "t3", "title": "competitor matrix", "noun": "Comparison sheet", "rows": None})),
+            ("wf-readout-outline-v3", "ReadoutOutline_v3", "Approved workflow",
+             "Presentation outline for a project readout, with the key point, evidence and owner of each section.",
+             "Elena Ruiz", "Strategy", "Nov 3, 2026", MANAGER,
+             "Shared with Strategy, interns included",
+             json.dumps(["Section", "Key point", "Evidence to show", "Owner"]),
+             "The project's findings", json.dumps(["Strategy"]),
+             json.dumps({"task": "t4", "title": "readout outline", "noun": "Presentation outline",
+                         "rows": ["Why this matters", "Who we compared", "What we found", "Gaps we can use",
+                                  "Recommendation"]})),
             ("wf-board-deck-q3", "BoardDeck_Q3", "Approved workflow",
              "Quarterly board deck outline with finance tables.",
              "Dana Ortiz", "Finance", "Sep 12, 2026", "Dana Ortiz",
              "Finance only", json.dumps(["Section", "Owner", "Status"]),
-             "Quarterly figures", json.dumps(["Finance"])),
+             "Quarterly figures", json.dumps(["Finance"]),
+             json.dumps({"task": "t4", "title": "board deck", "noun": "Board deck", "rows": ["Summary"]})),
             ("wf-interview-synth", "InterviewSynthesis_v1", "Approved workflow",
              "Template for turning customer interview notes into themes.",
              "Marcus Bell", "Strategy", "Aug 30, 2026", MANAGER,
              "Shared with Strategy, interns included",
              json.dumps(["Theme", "Quote", "Customer", "Strength"]),
-             "Interview notes", json.dumps(["Strategy"])),
+             "Interview notes", json.dumps(["Strategy"]),
+             json.dumps({"task": "t2", "title": "interview themes", "noun": "Theme sheet",
+                         "rows": ["Theme 1", "Theme 2", "Theme 3"]})),
         ])
         _conn.commit()
 
 
 with _lock:
     _conn.executescript(SCHEMA)
-if not query("SELECT 1 FROM tasks LIMIT 1"):
+# A database from before a table gained a column is rebuilt, so the server always starts.
+_current = "plan" in [c["name"] for c in query("PRAGMA table_info(workflows)")]
+if not _current or not query("SELECT 1 FROM tasks LIMIT 1"):
     reset()

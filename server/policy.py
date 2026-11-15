@@ -17,7 +17,7 @@ ON_PROJECT = re.compile(
     r"pantryline|crateworks|tallyhouse|larder|presentation|deck|slides|findings|grocers?|inventory)\b", re.I)
 REBUILD = re.compile(
     r"\b(build|create|make|generate|write|set up|automate)\b[\s\S]*"
-    r"\b(spreadsheet|excel|sheet|matrix|table|template|workflow|automation)\b", re.I)
+    r"\b(spreadsheet|excel|sheet|matrix|table|template|workflow|automation|outline)\b", re.I)
 VAGUE = re.compile(r"\b(budget|offsite|email|schedule)\b", re.I)
 
 

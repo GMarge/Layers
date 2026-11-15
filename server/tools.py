@@ -19,7 +19,7 @@ LABELS = {
     "check_company_policy": "Checking the workspace rules",
     "search_org_memory": "Searching your team's approved workflows",
     "check_access": "Confirming you are allowed to use it",
-    "create_project_artifact": "Building the Project X comparison sheet",
+    "create_project_artifact": "Building it in Project X",
     "update_task_status": "Updating your Project X tasks",
     "request_manager_approval": f"Asking {db.MANAGER} to take a look",
     "submit_verdict": "Deciding what to do with this prompt",
@@ -95,6 +95,11 @@ def workflow_public(row: dict) -> dict:
     }
 
 
+def plan_of(row: dict) -> dict:
+    """What applying a workflow makes, and which project task it moves."""
+    return json.loads(row["plan"])
+
+
 def get_project_context() -> str:
     """Return the employee's assigned project: its brief, tasks and due date."""
     def body():
@@ -147,16 +152,17 @@ def check_access(workflow_id: str) -> str:
 
 
 def create_project_artifact(workflow_id: str) -> str:
-    """Create a Project X comparison sheet from an approved workflow, filled with the project's competitors."""
+    """Create a Project X document from an approved workflow, set up with the project's own details."""
     def body():
         row = _workflow_row(workflow_id)
         if not row or not _can_use(row):
             raise PermissionError("That workflow is not shared with this employee.")
+        plan = plan_of(row)
         columns = json.loads(row["columns"])
-        rows = [[name] + [""] * (len(columns) - 1) for name in db.COMPETITORS]
+        rows = [[name] + [""] * (len(columns) - 1) for name in (plan["rows"] or db.COMPETITORS)]
         artifact_id = f"sheet-{uuid.uuid4().hex[:8]}"
         db.execute("INSERT INTO artifacts VALUES (?, ?, ?, ?, ?, ?, ?)",
-                   (artifact_id, f"{db.PROJECT['name']} competitor matrix", row["name"], row["author"],
+                   (artifact_id, f"{db.PROJECT['name']} {plan['title']}", row["name"], row["author"],
                     json.dumps(columns), json.dumps(rows), time.time()))
         _scratch["artifact_id"] = artifact_id
         return f"Created {artifact_id}.", f"{len(rows)} rows, {len(columns)} columns"
@@ -164,7 +170,7 @@ def create_project_artifact(workflow_id: str) -> str:
 
 
 def update_task_status(task_id: str, status: str) -> str:
-    """Set a Project X task to todo, doing or done. The spreadsheet task is t3."""
+    """Set a Project X task to todo, doing or done. Use the task id the request names."""
     def body():
         if status not in ("todo", "doing", "done"):
             raise ValueError("status must be todo, doing or done")
