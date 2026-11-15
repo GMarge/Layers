@@ -51,7 +51,7 @@ def main():
     ])
     supervisor = agent.build(model)
     scratch = tools.start_run(events.append)
-    said = agent.run(supervisor, "REVIEW this prompt: Build me an Excel automation")
+    said, _ = agent.run(supervisor, "REVIEW this prompt: Build me an Excel automation")
     tools.end_run()
     assert scratch["verdict"]["kind"] == "reuse", scratch
     assert scratch["calls"] == ["get_project_context", "check_company_policy", "search_org_memory",
@@ -68,7 +68,11 @@ def main():
     ]
     events.clear()
     scratch = tools.start_run(events.append)
-    said = agent.run(supervisor, "ACT: apply workflow wf-competitor-matrix-v2")
+    _, paused = agent.run(supervisor, "ACT: apply workflow wf-competitor-matrix-v2", "t-act")
+    assert paused, "the harness should pause before creating anything"
+    assert "artifact_id" not in scratch, "nothing may be created before approval"
+    print("pause ok: harness stopped before create_project_artifact")
+    said, _ = agent.resume(supervisor, "t-act", True)
     tools.end_run()
     assert db.query("SELECT 1 FROM artifacts WHERE id = ?", (scratch["artifact_id"],)), "no artifact"
     assert db.query("SELECT status FROM tasks WHERE id = 't3'")[0]["status"] == "doing"
@@ -78,7 +82,9 @@ def main():
     # A model that tries to use another team's workflow is stopped by the tool, not by the prompt.
     model.script[:] = [call("create_project_artifact", workflow_id="wf-board-deck-q3"), AIMessage(content="ok")]
     scratch = tools.start_run(events.append)
-    agent.run(supervisor, "ACT: apply workflow wf-board-deck-q3")
+    _, paused = agent.run(supervisor, "ACT: apply workflow wf-board-deck-q3", "t-deny")
+    if paused:
+        agent.resume(supervisor, "t-deny", True)
     tools.end_run()
     assert "artifact_id" not in scratch, "permission check failed"
     print("permission ok: Finance workflow refused")
