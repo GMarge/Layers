@@ -206,6 +206,8 @@ def run() -> None:
     main.reset()
     check("starting over clears the work", not db.query("SELECT 1 FROM artifacts") and not db.query("SELECT 1 FROM approvals"))
     check("and keeps the model-run count", db.setting("runs:2026-01-01") == "7")
+    check("the model-run count can be set back to zero, and the cap stays",
+          main.reset_runs() == {"used": 0, "cap": agent.DAILY_RUN_CAP} and db.setting("runs:2026-01-01") == "")
 
 
 if __name__ == "__main__":

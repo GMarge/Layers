@@ -30,6 +30,15 @@ const VIEWS: [View, string, string][] = [
 /** The demo's examples, one click each. Every one plays in the employee's workspace. */
 function TryMenu({ view }: { view: View }) {
   const [open, setOpen] = useState(false);
+  /** Today's model runs, read when the menu opens. Null when there is no server to ask. */
+  const [runs, setRuns] = useState<{ used: number; cap: number } | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/settings')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((settings: { runs?: { used: number; cap: number } } | null) => setRuns(settings?.runs ?? null))
+      .catch(() => setRuns(null));
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const close = (e: Event) => {
@@ -49,6 +58,14 @@ function TryMenu({ view }: { view: View }) {
   }, [open]);
 
   const play = (id: string) => {
+    if (id === 'runs') {
+      // The menu stays open, so the count going back to zero is the confirmation.
+      void fetch('/api/runs/reset', { method: 'POST' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((now: { used: number; cap: number } | null) => now && setRuns(now))
+        .catch(() => {});
+      return;
+    }
     setOpen(false);
     if (id === 'intro') {
       window.location.hash = '#intro';
@@ -68,12 +85,15 @@ function TryMenu({ view }: { view: View }) {
   const group = (title: string, items: TryItem[]) => (
     <>
       <p>{title}</p>
-      {items.map((item) => (
-        <button key={item.id} type="button" role="menuitem" onClick={() => play(item.id)}>
-          <b>{item.label}</b>
-          <span>{item.hint}</span>
-        </button>
-      ))}
+      {items
+        // Resetting the count needs the server, so a copy without one does not offer it.
+        .filter((item) => item.id !== 'runs' || runs)
+        .map((item) => (
+          <button key={item.id} type="button" role="menuitem" onClick={() => play(item.id)}>
+            <b>{item.label}</b>
+            <span>{item.id === 'runs' && runs ? `${runs.used} of ${runs.cap} used today. Sets it back to zero.` : item.hint}</span>
+          </button>
+        ))}
     </>
   );
 

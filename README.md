@@ -74,7 +74,7 @@ A free model tier allows only so many requests a minute and a day. Layers keeps 
 Check everything without a key or a model run:
 
 ```bash
-.venv/bin/python -m tests.smoke              # 45 end-to-end checks on a copy of the server
+.venv/bin/python -m tests.smoke              # 46 end-to-end checks on a copy of the server
 .venv/bin/python -m tests.test_agent_wiring  # the agent's pause, resume and permission refusal
 ```
 

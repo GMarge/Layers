@@ -33,6 +33,7 @@ export const TRY_OPEN: TryItem[] = [
   { id: 'today', label: 'Today so far', hint: 'Progress from branches and tasks' },
   { id: 'agent', label: 'What the agent did', hint: 'Every run and tool call' },
   { id: 'reset', label: 'Start over', hint: 'Clear everything' },
+  { id: 'runs', label: 'Reset model runs', hint: "Set today's count back to zero" },
 ];
 
 /** The three prompts that show a direction being noticed, returned to, and given its own chat. */

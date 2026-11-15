@@ -6,7 +6,7 @@
 cd ~/layers && .venv/bin/python -m tests.smoke
 ```
 
-45 checks in a few seconds. It is free: it runs on a copy of the server with no model and its own empty database, so it never touches the running app or your model-run count. Run it after any change. If a line says `FAIL`, that is the thing that broke.
+46 checks in a few seconds. It is free: it runs on a copy of the server with no model and its own empty database, so it never touches the running app or your model-run count. Run it after any change. If a line says `FAIL`, that is the thing that broke.
 
 There is a second one for the agent's wiring (the pause before it creates or sends anything). It uses a scripted stand-in for the model, so it is free too:
 
@@ -20,7 +20,7 @@ cd ~/layers && .venv/bin/python -m tests.test_agent_wiring
 - **Refresh**, in the dark bar at the top, starts the whole demo over.
 - Wait for each answer before sending the next prompt. The free model slows down when prompts come back to back, and a check can then take a minute. The agent says "Still checking" when that happens.
 - **Try it**, in the dark bar at the top, has every example below as one click. Each one types the prompt and sends it for you. It is there at any window size.
-- Each real prompt uses 1 to 3 of the 60 model runs allowed per day. When they run out, Layers says so and works on rules alone. To set the count back to zero:
+- Each real prompt uses 1 to 3 of the 60 model runs allowed per day. When they run out, Layers says so and works on rules alone. To set the count back to zero, click **Try it**, then **Reset model runs**: it shows how many are used, and the daily limit of 60 stays. Or from a terminal:
 
 ```bash
 cd ~/layers && sqlite3 layers.db "delete from settings where key like 'runs:%'"

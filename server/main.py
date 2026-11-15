@@ -268,6 +268,13 @@ def reset():
     return {"ok": True}
 
 
+@app.post("/api/runs/reset")
+def reset_runs() -> dict:
+    """Set the model-run count back to zero. A control for the demo: the daily cap itself stays."""
+    db.execute("DELETE FROM settings WHERE key LIKE 'runs:%'")
+    return agent.usage()
+
+
 def company_settings() -> dict:
     return {"policy_mode": db.setting("policy_mode") or "approval",
             "unsure_mode": db.setting("unsure_mode") or "ask"}
