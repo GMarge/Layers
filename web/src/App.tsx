@@ -2,15 +2,18 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BranchPanel, type PanelTab } from './branches/BranchPanel';
 import {
   addPrompt,
+  addStop,
   branchFrom,
   chatOf,
   chatTitle,
   chatsOf,
+  dropStop,
   earnsChat,
   fold,
   isVisible,
   lastLineIn,
   lineLabel,
+  markStop,
   mergeAll,
   mergeBack,
   openLines,
@@ -46,7 +49,8 @@ import type {
   Verdict,
 } from './layers/types';
 import { useMediaQuery } from './ui/useMediaQuery';
-import { conversations, manager, project, seedMessages, seedTasks, tryPrompts } from './workspace/data';
+import { competitorMatrix, conversations, examplePrompts, manager, project, seedMessages, seedTasks } from './workspace/data';
+import { BRANCH_STORY, TRY_EVENT, TRY_PROMPTS } from './workspace/tries';
 import { Workspace, type ForkMark } from './workspace/Workspace';
 
 /** What the first chat is called. Branches that become chats are named after their direction. */
@@ -325,7 +329,8 @@ export default function App({ active = true }: { active?: boolean }) {
     // The agent's reading of the prompt if it gave one. Otherwise the keyword list decides.
     const hint = hints.current.has(prompt) ? hints.current.get(prompt) : undefined;
     hints.current.delete(prompt);
-    const added = addPrompt(treeRef.current, prompt, seq.current, hint);
+    // It is going through now, so it is no longer a stopped prompt on the map.
+    const added = addPrompt(dropStop(treeRef.current, prompt), prompt, seq.current, hint);
     let next = added.tree;
     const back = added.returned;
     // Coming back to the same noticed direction again: it has earned a chat of its own.
@@ -410,6 +415,11 @@ export default function App({ active = true }: { active?: boolean }) {
     }
 
     setCounters((c) => ({ ...c, held: c.held + 1 }));
+    // A stopped prompt goes on the branch map as a dead end, so it is not forgotten.
+    if (verdict.kind !== 'reuse') {
+      const waiting = verdict.kind === 'unsure' && unsureRef.current === 'defer';
+      changeTree(addStop(treeRef.current, prompt, verdict.kind, waiting ? 'waiting' : 'held'));
+    }
     if (verdict.kind === 'policy') {
       setHold({ kind: 'policy', label: `Not sent. Held by rule ${verdict.rule.id}.` });
       setScene({
@@ -556,6 +566,8 @@ export default function App({ active = true }: { active?: boolean }) {
   const backToProject = () => {
     const text = draftRef.current.trim();
     const wasPending = sceneRef.current.name === 'pending';
+    // Withdrawn: it stays on the map as stopped, but it is no longer with the manager.
+    if (wasPending && text) changeTree(markStop(treeRef.current, text, 'held'));
     run.current++;
     if (text) setSetAside(text);
     setDraft('');
@@ -579,6 +591,7 @@ export default function App({ active = true }: { active?: boolean }) {
     const token = ++run.current;
     const { id, approver } = await service.requestApproval(s.prompt, note);
     if (token !== run.current) return;
+    changeTree(markStop(treeRef.current, s.prompt, 'waiting'));
     setHold({ kind: 'pending', label: `Waiting on ${approver}. Request ${id}.` });
     setScene({ name: 'pending', prompt: s.prompt, rule: s.rule, requestId: id, approver });
   };
@@ -630,6 +643,7 @@ export default function App({ active = true }: { active?: boolean }) {
     if (!answered) settled.current = service.decide?.(s.requestId, approved).catch(() => {}) ?? Promise.resolve();
     setScene({ name: 'decided', approved, approver: s.approver });
     if (!approved) {
+      changeTree(markStop(treeRef.current, s.prompt, 'declined'));
       setHold({ kind: 'policy', label: `Declined by ${s.approver}. Draft kept.` });
       return;
     }
@@ -900,6 +914,8 @@ export default function App({ active = true }: { active?: boolean }) {
     setUpdate({ ...NO_UPDATE, phase: 'working' });
     try {
       const draft = await service.draftUpdate(onUpdateEvent);
+      // Only the agent's own working time is counted, not how long the draft waited to be read.
+      updateBegan.current = performance.now() - updateBegan.current;
       setUpdate((u) => ({ ...u, phase: 'draft', text: draft.text, thread: draft.thread, by: backend ? draft.by : 'preview' }));
     } catch {
       setUpdate(NO_UPDATE);
@@ -912,6 +928,7 @@ export default function App({ active = true }: { active?: boolean }) {
     const text = wording.trim();
     if (draft.phase !== 'draft' || !service.sendUpdate || (approved && !text)) return;
     setUpdate({ ...draft, phase: 'sending' });
+    const resumed = performance.now();
     try {
       await service.sendUpdate(draft.thread, text || draft.text, approved, onUpdateEvent);
     } catch {
@@ -931,7 +948,7 @@ export default function App({ active = true }: { active?: boolean }) {
           : 'Sent after you approved it.',
       plan: after.plan,
       steps: after.steps,
-      ms: Math.round(performance.now() - updateBegan.current),
+      ms: Math.round(updateBegan.current + performance.now() - resumed),
     });
     setUpdate(approved ? { ...after, phase: 'sent', text, at: Date.now() } : NO_UPDATE);
     notify(approved ? `Sent to ${manager.first}.` : 'Draft dropped. Nothing was sent.');
@@ -1051,6 +1068,78 @@ export default function App({ active = true }: { active?: boolean }) {
     setUpdate(NO_UPDATE);
   };
 
+  /** Type a prompt into the chat box as a person would, then send it. */
+  const typeAndSend = async (text: string): Promise<boolean> => {
+    if (hold?.kind === 'pending') {
+      notify(`A request is waiting on ${manager.first}. Withdraw it, or wait for the answer, first.`);
+      return false;
+    }
+    const busy = sceneRef.current.name;
+    if (busy === 'checking' || busy === 'working') return false;
+    setPanel(null);
+    setScene({ name: 'ambient' });
+    setHold(null);
+    stash.current = null;
+    const token = ++run.current;
+    focusPrompt();
+    await wait(140);
+    if (reduced) setDraft(text);
+    else
+      for (let i = 1; i <= text.length; i++) {
+        if (token !== run.current) return false;
+        setDraft(text.slice(0, i));
+        await wait(10 + Math.random() * 16);
+      }
+    await wait(240);
+    if (token !== run.current) return false;
+    await send(text);
+    return true;
+  };
+
+  /** Play one of the demo's examples from the bar at the top. */
+  const tryIt = async (id: string) => {
+    const prompt = TRY_PROMPTS.find((t) => t.id === id)?.prompt;
+    if (prompt) return void (await typeAndSend(prompt));
+    if (id === 'reset') return reset();
+    if (id === 'ask' || id === 'settings') {
+      setPanel(null);
+      setScene(id === 'ask' ? { name: 'ask', question: '', busy: false, answer: null } : { name: 'settings' });
+      return;
+    }
+    if (id === 'branches' || id === 'today' || id === 'agent') {
+      setScene((s) => (s.name === 'ask' || s.name === 'settings' ? { name: 'ambient' } : s));
+      return setPanel(id);
+    }
+    if (id === 'update') {
+      setPanel('today');
+      return void draftUpdate();
+    }
+    if (id === 'work') {
+      setPanel(null);
+      return void runWorkflow(competitorMatrix, examplePrompts.rebuild);
+    }
+    if (id === 'story') {
+      // Each prompt waits for the last one's answer, the way a person would.
+      for (const step of BRANCH_STORY) {
+        const want = messagesRef.current.length + 2;
+        if (!(await typeAndSend(step))) return;
+        for (let i = 0; i < 240 && messagesRef.current.length < want; i++) {
+          await wait(250);
+          if (sceneRef.current.name !== 'ambient' && sceneRef.current.name !== 'checking') return;
+        }
+        await wait(500);
+      }
+    }
+  };
+  const tryRef = useRef(tryIt);
+  tryRef.current = tryIt;
+  useEffect(() => {
+    if (!active) return;
+    const onTry = (e: Event) => void tryRef.current(String((e as CustomEvent<string>).detail));
+    window.addEventListener(TRY_EVENT, onTry);
+    return () => window.removeEventListener(TRY_EVENT, onTry);
+  }, [active]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Alt+L hides the agent or brings it back, from anywhere, even mid-sentence.
@@ -1118,11 +1207,6 @@ export default function App({ active = true }: { active?: boolean }) {
         layersHidden={lab.rest === 'hidden'}
         onShowLayers={toggleHidden}
         reserve={reserve}
-        tries={tryPrompts}
-        onTry={(prompt) => {
-          changeDraft(prompt);
-          focusPrompt();
-        }}
         status={
           !backend
             ? 'Preview without the Layers server. Checks and branches work; answers are placeholders.'
@@ -1199,6 +1283,12 @@ export default function App({ active = true }: { active?: boolean }) {
             detachBranch(lineId);
           }}
           onFold={foldBranch}
+          onRestoreStop={(text) => {
+            setPanel(null);
+            changeDraft(text);
+            focusPrompt();
+          }}
+          onDropStop={(text) => changeTree(dropStop(treeRef.current, text))}
         />
       )}
       <Toast toast={toast} onClose={() => setToast(null)} />

@@ -44,10 +44,44 @@ export interface PromptNode {
   visit: number;
 }
 
+/**
+ * A prompt Layers stopped and that never went through. It is not a dot on a line, because
+ * it was never sent: the map draws it as a short dead end off the line it was typed on.
+ */
+export interface Stop {
+  id: string;
+  line: string;
+  /** Index of the last prompt sent before this one was stopped. */
+  after: number;
+  text: string;
+  why: 'policy' | 'unsure';
+  /** held: stopped, and left there. waiting: with the manager. declined: the manager said no. */
+  state: 'held' | 'waiting' | 'declined';
+}
+
 export interface Tree {
   lines: Line[];
   nodes: PromptNode[];
   active: string;
+  stops?: Stop[];
+}
+
+/** Record a prompt that was stopped. Stopping the same prompt again moves its mark. */
+export function addStop(tree: Tree, text: string, why: Stop['why'], state: Stop['state'] = 'held'): Tree {
+  const rest = (tree.stops ?? []).filter((s) => s.text !== text);
+  const id = `s${Date.now().toString(36)}${rest.length}`;
+  return { ...tree, stops: [...rest, { id, line: tree.active, after: tree.nodes.length - 1, text, why, state }] };
+}
+
+export function markStop(tree: Tree, text: string, state: Stop['state']): Tree {
+  if (!tree.stops?.some((s) => s.text === text && s.state !== state)) return tree;
+  return { ...tree, stops: tree.stops.map((s) => (s.text === text ? { ...s, state } : s)) };
+}
+
+/** The prompt went through after all, or the employee cleared the mark. */
+export function dropStop(tree: Tree, text: string): Tree {
+  if (!tree.stops?.some((s) => s.text === text)) return tree;
+  return { ...tree, stops: tree.stops.filter((s) => s.text !== text) };
 }
 
 /** What the agent said a prompt is about, when it looked at it. */
@@ -165,7 +199,7 @@ export function addPrompt(tree: Tree, text: string, seq: number, hint?: TopicHin
   }
   const node: PromptNode = { id: `n${tree.nodes.length}`, line: target.id, text, seq, reopened, visit: target.visits };
   return {
-    tree: { lines, nodes: [...tree.nodes, node], active: target.id },
+    tree: { ...tree, lines, nodes: [...tree.nodes, node], active: target.id },
     branched,
     returned: reopened && target.kind === 'implicit' ? target : null,
     routed,
@@ -326,7 +360,11 @@ export interface MapShape {
   }[];
   nodes: { line: string; reopened: boolean; visit: number }[];
   active: string;
+  /** Prompts that were stopped: where, and how it ended. Never what they said. */
+  stops?: { line: string; after: number; state: Stop['state'] }[];
 }
+
+const stopShapes = (tree: Tree) => (tree.stops ?? []).map((s) => ({ line: s.line, after: s.after, state: s.state }));
 
 export function shapeOf(tree: Tree, rootTitle?: string): MapShape {
   return {
@@ -341,6 +379,7 @@ export function shapeOf(tree: Tree, rootTitle?: string): MapShape {
     })),
     nodes: tree.nodes.map((n) => ({ line: n.line, reopened: n.reopened, visit: n.visit })),
     active: tree.active,
+    stops: stopShapes(tree),
   };
 }
 
@@ -359,6 +398,7 @@ export function outlineOf(tree: Tree) {
     })),
     nodes: tree.nodes.map((n) => ({ line: n.line, reopened: n.reopened, visit: n.visit })),
     active: tree.active,
+    stops: stopShapes(tree),
   };
 }
 

@@ -16,3 +16,6 @@ __pycache__/
 *.sqlite3
 
 .DS_Store
+
+# Vercel CLI link
+.vercel

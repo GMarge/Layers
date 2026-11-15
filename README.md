@@ -14,7 +14,9 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 - **Not sure:** Layers says so, shows what counted each way, and follows the company's choice: ask the employee, let it through and log it, or hand it to a person.
 
 - **Branches:** when the conversation moves to a different part of the project, Layers gives that direction its own line without being asked (an implicit branch). When the employee keeps coming back to the same direction, Layers moves it into a chat of its own (an explicit branch), listed under the chat it came from, and says so with a one-key undo. One return is enough when that direction is a third of the chat or more; a small aside has to grow to three prompts or be returned to twice. Layers shows the numbers it went on. The employee can also start a chat from any earlier prompt, merge lines back one at a time or all at once, and put a chat back where it came from. Each chat only gives the model its own history plus what it shared before it split.
-- **The branch map:** right-click the agent, or use the Branches button, for a page that draws the conversation: one row per line, one dot per prompt, a number where the employee came back to a line, and a zigzag for a long unbroken run. A second tab, "Today so far", reads progress from the branches and the task list.
+- **The branch map:** right-click the agent, or use the Branches button, for a page that draws the conversation: one row per line, one dot per prompt, a number where the employee came back to a line, a zigzag for a long unbroken run, and a red dead end for a prompt that was stopped and never sent. A second tab, "Today so far", reads progress from the branches and the task list.
+- **A status update, drafted by the agent:** from "Today so far" the agent reads the day's results (tasks, documents, counts, never what was typed), writes the manager a short update, and stops. The employee can change the wording, and only their approval sends it.
+- **The agent, in the open:** a third tab explains how the gate, the agent and the person fit together, lists every tool the agent has, and keeps a record of each run with its plan, tool calls and timings.
 - **The manager's view** (`#manager`): approval requests with the reason and the words that triggered them, the rules, the team, then one person at a time with their activity, task progress and branch map.
 - **The manager sets the rules:** what happens to an off-project prompt (held for approval, or a warning) and to an unclear one (ask the employee, send and log, or send to the manager). A change reaches every open workspace within two seconds and tells the employee.
 - **Audit trail:** the manager's page lists every check, tool call and decision with who did it, when and how long it took. What the employee typed is left out.
@@ -38,7 +40,7 @@ flowchart TD
 - **The gate enforces.** `server/policy.py` and the checks inside each tool decide what is allowed. `/api/chat` refuses any prompt without an allowing decision on record.
 - **The agent proposes and explains.** `server/agent.py` is one `create_deep_agent` call with these tools: `get_project_context`, `check_company_policy`, `search_org_memory`, `check_access`, `create_project_artifact`, `update_task_status`, `request_manager_approval`, `submit_verdict`, and a `knowledge-scout` subagent. It cannot clear a prompt the rules flagged.
 - **The agent plans.** With the planning middleware it writes its own to-do list (`write_todos`) and ticks items off. The bubble shows that list as the agent wrote it.
-- **The harness pauses for a person.** `create_project_artifact` is listed in `interrupt_on`, so DeepAgents stops the agent before anything is created and holds the run in a checkpointer. The employee's click resumes it.
+- **The harness pauses for a person.** `create_project_artifact` and `send_status_update` are listed in `interrupt_on`, so DeepAgents stops the agent before anything is created or sent and holds the run in a checkpointer. The employee's click resumes it. For an update they can edit first, and their wording is what is sent.
 - **A person approves.** Only the manager endpoint can approve a held prompt.
 - **It adapts.** When the employee explains how a prompt connects to the project, Layers remembers the distinctive words and stops flagging that kind of request. No model is trained.
 - **Everything is logged.** Each tool call is timed, shown to the employee in plain English, and written to the audit log.
@@ -56,7 +58,18 @@ npm --prefix web run dev    # in a second terminal, then open http://localhost:5
 
 Without a model key the server runs on rules alone and the interface says so. Without the server the interface falls back to a scripted preview and says so.
 
-Check the agent wiring without a key: `.venv/bin/python -m tests.test_agent_wiring`
+Check everything without a key or a model run:
+
+```bash
+.venv/bin/python -m tests.smoke              # 32 end-to-end checks on a copy of the server
+.venv/bin/python -m tests.test_agent_wiring  # the agent's pause, resume and permission refusal
+```
+
+[TESTING.md](TESTING.md) is the list to go through by hand. `scripts/shots.py` retakes the pictures in `docs/shots` from a real session.
+
+### A public preview
+
+The `web` folder deploys to any static host as it is (on Vercel: set the root directory to `web`). With no server behind it the workspace says so and runs as a preview: the checks, branches and screens all work, a scripted stand-in plays the agent, and answers are placeholders. The live agent needs the server, which holds a database and paused agent runs, so it runs on a machine that stays up rather than on serverless functions.
 
 ## What is real and what is not
 

@@ -15,6 +15,9 @@ interface Props {
   onPick?(index: number | null): void;
   /** What a dot is called for a screen reader. */
   describe?(index: number): string;
+  /** Index of the chosen stopped prompt, and what to do when one is picked. */
+  pickedStop?: number | null;
+  onPickStop?(index: number | null): void;
 }
 
 const SIZES = {
@@ -50,20 +53,36 @@ interface Fold {
 function place(shape: MapShape, opened: Set<number>, step: number, foldWidth: number) {
   const n = shape.nodes.length;
   const forks = new Set(shape.lines.map((l) => l.fork));
+  const stops = shape.stops ?? [];
+  // A stopped prompt sits just after the last prompt that was sent before it.
+  const stoppedAfter = (i: number) => stops.map((s, k) => (Math.min(Math.max(s.after, 0), n - 1) === i ? k : -1)).filter((k) => k >= 0);
   const keep = shape.nodes.map((node, i) => {
     const before = shape.nodes[i - 1];
     const after = shape.nodes[i + 1];
-    return !before || !after || before.line !== node.line || after.line !== node.line || forks.has(i) || node.reopened;
+    return (
+      !before ||
+      !after ||
+      before.line !== node.line ||
+      after.line !== node.line ||
+      forks.has(i) ||
+      node.reopened ||
+      stoppedAfter(i).length > 0
+    );
   });
 
   const xs: number[] = [];
+  const stopXs: number[] = [];
   const hidden = new Set<number>();
   const folds: Fold[] = [];
   let x = 0;
   for (let i = 0; i < n; ) {
     if (keep[i]) {
       xs[i] = x;
-      x += step;
+      const here = stoppedAfter(i);
+      here.forEach((k, j) => {
+        stopXs[k] = x + step * 0.55 * (j + 1);
+      });
+      x += step + step * 0.55 * here.length;
       i += 1;
       continue;
     }
@@ -85,15 +104,16 @@ function place(shape: MapShape, opened: Set<number>, step: number, foldWidth: nu
     }
     i = j;
   }
-  return { xs, hidden, folds, width: Math.max(0, x - step) };
+  return { xs, stopXs, hidden, folds, width: Math.max(0, x - step) };
 }
 
-export function BranchMap({ shape, size = 'full', picked = null, onPick, describe }: Props) {
+export function BranchMap({ shape, size = 'full', picked = null, onPick, describe, pickedStop = null, onPickStop }: Props) {
   const [opened, setOpened] = useState<Set<number>>(() => new Set());
   const { step, row, pad, fold } = SIZES[size];
   const order = rowsFor(shape);
   const rowOf = new Map(order.map((id, i) => [id, i]));
-  const { xs, hidden, folds, width } = place(shape, opened, step, fold);
+  const { xs, stopXs, hidden, folds, width } = place(shape, opened, step, fold);
+  const stub = size === 'full' ? 14 : 10;
 
   const x = (i: number) => pad + (xs[i] ?? 0);
   const y = (line: string) => pad + (rowOf.get(line) ?? 0) * row;
@@ -175,7 +195,33 @@ export function BranchMap({ shape, size = 'full', picked = null, onPick, describ
             {strokes.map((s, i) => (
               <path key={i} d={s.d} className={`bmap__stroke bmap__stroke--${s.kind}`} />
             ))}
+            {(shape.stops ?? []).map((s, k) => {
+              // A dead end: up off the line, and capped. The prompt went no further.
+              const sx = pad + (stopXs[k] ?? 0);
+              const sy = y(s.line);
+              return (
+                <path
+                  key={`stop-${k}`}
+                  d={`M${sx} ${sy}V${sy - stub}M${sx - 5} ${sy - stub}H${sx + 5}`}
+                  className="bmap__stroke bmap__stroke--stop"
+                  data-state={s.state}
+                />
+              );
+            })}
           </svg>
+          {onPickStop &&
+            (shape.stops ?? []).map((s, k) => (
+              <button
+                key={`stop-${k}`}
+                type="button"
+                className="bmap__stop"
+                style={{ left: pad + (stopXs[k] ?? 0), top: y(s.line) - stub }}
+                aria-pressed={pickedStop === k}
+                aria-label={`A prompt that was stopped${s.state === 'waiting' ? ' and is with your manager' : s.state === 'declined' ? ' and declined' : ''}`}
+                title="A prompt that was stopped"
+                onClick={() => onPickStop(pickedStop === k ? null : k)}
+              />
+            ))}
           {folds.map((f) => (
             <button
               key={f.key}

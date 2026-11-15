@@ -161,11 +161,19 @@ class NodeIn(BaseModel):
     visit: int = Field(default=1, ge=1, le=99)
 
 
+class StopIn(BaseModel):
+    """A prompt that was stopped: where it happened and how it ended. Not what it said."""
+    line: str = Field(pattern=LINE_ID)
+    after: int = Field(default=0, ge=-1, le=2000)
+    state: Literal["held", "waiting", "declined"] = "held"
+
+
 class BranchesIn(BaseModel):
     """The shape of a conversation. There is no field here that could carry what was typed."""
     lines: list[LineIn] = Field(max_length=80)
     nodes: list[NodeIn] = Field(max_length=600)
     active: str = Field(pattern=LINE_ID)
+    stops: list[StopIn] = Field(default_factory=list, max_length=200)
 
 
 def stream(work: Callable[[Callable[[dict], None]], dict]) -> StreamingResponse:
@@ -662,12 +670,13 @@ def branches(body: BranchesIn):
                    "merged": line.merged, "promoted": line.promoted} for line in body.lines],
         "nodes": [node.model_dump() for node in body.nodes],
         "active": body.active,
+        "stops": [stop.model_dump() for stop in body.stops],
     }
     db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", ("branches", json.dumps(shape)))
     return {"ok": True}
 
 
-def _shape(lines: list[tuple], nodes: list[tuple], active: str) -> dict:
+def _shape(lines: list[tuple], nodes: list[tuple], active: str, stops: tuple = ()) -> dict:
     seen: dict[str, int] = {}
     dots = []
     for line, visit in nodes:  # a prompt re-opens a line when it starts a new visit to it
@@ -679,6 +688,7 @@ def _shape(lines: list[tuple], nodes: list[tuple], active: str) -> dict:
                   for i, kind, parent, fork, label, merged, promoted in lines],
         "nodes": dots,
         "active": active,
+        "stops": [{"line": line, "after": after, "state": state} for line, after, state in stops],
     }
 
 
@@ -707,7 +717,7 @@ SAMPLE_TEAM = [
              ("l2", "explicit", "main", 4, "Synthesis draft", False, True)],
             [("main", 1), ("main", 1), ("l1", 1), ("l1", 1), ("main", 2), ("l2", 1), ("main", 3),
              ("l2", 2), ("l2", 2), ("l2", 2)],
-            "l2"),
+            "l2", (("main", 3, "held"),)),
     },
     {
         "id": "ines", "name": "Ines Okafor", "role": "Associate", "team": "Strategy", "sample": True,

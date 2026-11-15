@@ -100,6 +100,35 @@
   stroke: var(--ink-3);
 }
 
+/* A stopped prompt: red is the colour of a held prompt everywhere in Layers. */
+.bmap__stroke--stop {
+  stroke: var(--layer-red);
+}
+
+.bmap__stroke--stop[data-state='waiting'] {
+  stroke: var(--layer-orange);
+}
+
+.bmap__stop {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  margin: -13px 0 0 -11px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+}
+
+.bmap__stop:hover,
+.bmap__stop[aria-pressed='true'] {
+  background: rgb(255 61 46 / 0.14);
+}
+
+.bmap__stop:focus-visible {
+  outline: 2px solid var(--agent);
+}
+
 .bmap__dot {
   position: absolute;
   display: grid;
@@ -230,6 +259,8 @@ button.bmap__dot:hover::after,
   inset: 0;
   z-index: 90;
   display: grid;
+  /* One row as tall as the screen, so the page inside can never grow past it. */
+  grid-template-rows: minmax(0, 1fr);
   place-items: center;
   padding: 24px;
   background: rgb(19 19 22 / 0.28);
@@ -240,6 +271,7 @@ button.bmap__dot:hover::after,
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   width: min(900px, 100%);
+  min-height: 0;
   max-height: min(780px, 100%);
   border-radius: 20px;
   background: var(--surface);
@@ -405,6 +437,14 @@ button.bmap__dot:hover::after,
 .bpanel__legend li[data-key='chat']::before {
   width: 18px;
   border-top: 2px solid var(--ink-3);
+}
+
+.bpanel__legend li[data-key='stop']::before {
+  width: 11px;
+  height: 10px;
+  background:
+    linear-gradient(var(--layer-red), var(--layer-red)) top / 100% 2px no-repeat,
+    linear-gradient(var(--layer-red), var(--layer-red)) center / 2px 100% no-repeat;
 }
 
 .bpanel__legend li[data-key='fold']::before {
@@ -855,75 +895,6 @@ button.bmap__dot:hover::after,
 .side__chat button:focus-visible,
 .topbar__branches:focus-visible,
 .thread__mark button:focus-visible {
-  outline: 2px solid var(--agent);
-  outline-offset: 1px;
-}
-
-/* Example prompts in the sidebar. They belong to the workspace, so they stay grey. */
-
-.try {
-  display: grid;
-  gap: 4px;
-}
-
-.try__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0 8px 4px;
-  border: 0;
-  background: none;
-  font-size: 12px;
-  color: var(--ink-3);
-}
-
-.try__head svg {
-  transition: transform var(--t-fast);
-}
-
-.try__head[aria-expanded='true'] svg {
-  transform: rotate(180deg);
-}
-
-.try ul {
-  display: grid;
-  gap: 1px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.try li button {
-  display: grid;
-  gap: 1px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  text-align: left;
-}
-
-.try li button:hover {
-  background: var(--well);
-}
-
-.try li b {
-  font-size: 12.5px;
-  font-weight: 560;
-  color: var(--ink-2);
-}
-
-.try li span {
-  overflow: hidden;
-  font-size: 12px;
-  color: var(--ink-3);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.try button:focus-visible {
   outline: 2px solid var(--agent);
   outline-offset: 1px;
 }

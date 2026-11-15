@@ -58,9 +58,6 @@ interface Props {
   onShowLayers(): void;
   /** Room Layers needs above the chat box. The thread leaves it free. */
   reserve: number;
-  /** Example prompts, each showing one thing Layers does. */
-  tries: { label: string; prompt: string }[];
-  onTry(prompt: string): void;
   /** Whether the live agent is behind this workspace, in a sentence. */
   status: string;
   /** Wipe the conversation and start the demo again. */
@@ -242,49 +239,6 @@ function Rich({ text }: { text: string }) {
   return <div className="msg__md">{blocks}</div>;
 }
 
-const TRY_KEY = 'layers.try';
-
-/** Example prompts in the sidebar. Picking one fills the chat box, so Send is still yours to press. */
-function TryList({ tries, onTry }: { tries: { label: string; prompt: string }[]; onTry(prompt: string): void }) {
-  const [open, setOpen] = useState(() => {
-    try {
-      return localStorage.getItem(TRY_KEY) !== 'closed';
-    } catch {
-      return true;
-    }
-  });
-  const toggle = () => {
-    setOpen((o) => {
-      try {
-        localStorage.setItem(TRY_KEY, o ? 'closed' : 'open');
-      } catch {
-        // Not remembered, which is fine.
-      }
-      return !o;
-    });
-  };
-  return (
-    <section className="try" aria-label="Things to try">
-      <button type="button" className="try__head" aria-expanded={open} onClick={toggle}>
-        <span>Things to try</span>
-        <Chevron />
-      </button>
-      {open && (
-        <ul>
-          {tries.map((t) => (
-            <li key={t.prompt}>
-              <button type="button" title={t.prompt} onClick={() => onTry(t.prompt)}>
-                <b>{t.label}</b>
-                <span>{t.prompt}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 const BranchIcon = () => (
   <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
     <path
@@ -435,7 +389,6 @@ export function Workspace(p: Props) {
             ))}
           </ul>
         </nav>
-        <TryList tries={p.tries} onTry={p.onTry} />
         <div className="side__foot">
           <p className="side__user">
             <span className="side__avatar" aria-hidden="true">

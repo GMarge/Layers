@@ -38,11 +38,22 @@ interface Props {
   onMergeAll(): void;
   onDetach(lineId: string): void;
   onFold(lineId: string): void;
+  /** Put a stopped prompt back in the chat box, or clear its mark from the map. */
+  onRestoreStop(text: string): void;
+  onDropStop(text: string): void;
 }
+
+const STOPPED = {
+  held: 'It was not sent, and it is still not sent.',
+  waiting: 'It is with your manager. It will be sent only if they approve it.',
+  declined: 'Your manager declined it, so it was not sent.',
+};
 
 function Branches(p: Props) {
   const { tree } = p;
   const [picked, setPicked] = useState<number | null>(null);
+  const [pickedStop, setPickedStop] = useState<number | null>(null);
+  const stop = pickedStop === null ? null : ((tree.stops ?? [])[pickedStop] ?? null);
   const node = picked === null ? null : (tree.nodes[picked] ?? null);
   const line = node ? tree.lines.find((l) => l.id === node.line)! : null;
   const here = chatOf(tree, tree.active);
@@ -67,8 +78,10 @@ function Branches(p: Props) {
       <BranchMap
         shape={shapeOf(tree, p.rootTitle)}
         picked={picked}
-        onPick={setPicked}
+        onPick={(i) => (setPicked(i), setPickedStop(null))}
         describe={(i) => `Prompt ${i + 1}: ${tree.nodes[i]?.text.slice(0, 60) ?? ''}`}
+        pickedStop={pickedStop}
+        onPickStop={(k) => (setPickedStop(k), setPicked(null))}
       />
 
       <ul className="bpanel__legend" aria-label="How to read the map">
@@ -76,10 +89,30 @@ function Branches(p: Props) {
         <li data-key="back">Came back to a line, and which visit it was</li>
         <li data-key="noticed">Noticed by {p.agentName}</li>
         <li data-key="chat">Its own chat</li>
+        <li data-key="stop">Stopped, and not sent</li>
         <li data-key="fold">A long run, folded. Click the number to open it</li>
       </ul>
 
-      {node && line ? (
+      {stop ? (
+        <div className="bpanel__card">
+          <p className="bpanel__kind">
+            <b>{stop.why === 'policy' ? 'Stopped under rule AI-01' : `${p.agentName} could not tell, and stopped it`}</b>
+            in {chatTitle(tree, chatOf(tree, stop.line), p.rootTitle)}
+          </p>
+          <p className="bpanel__text">{stop.text}</p>
+          <p className="bpanel__hint">{STOPPED[stop.state]}</p>
+          <div className="bpanel__acts">
+            {stop.state !== 'waiting' && (
+              <button type="button" className="bpanel__btn" onClick={() => p.onRestoreStop(stop.text)}>
+                Put it back in the chat box
+              </button>
+            )}
+            <button type="button" className="bpanel__btn" onClick={() => (p.onDropStop(stop.text), setPickedStop(null))}>
+              Clear it from the map
+            </button>
+          </div>
+        </div>
+      ) : node && line ? (
         <div className="bpanel__card">
           <p className="bpanel__kind">
             <b>
@@ -120,7 +153,7 @@ function Branches(p: Props) {
           </div>
         </div>
       ) : (
-        <p className="bpanel__hint">Pick a dot to read the prompt and see what you can do with it.</p>
+        <p className="bpanel__hint">Pick a dot, or a red stop, to read the prompt and see what you can do with it.</p>
       )}
 
       <h3>Chats</h3>

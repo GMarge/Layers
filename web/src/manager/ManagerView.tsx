@@ -95,6 +95,8 @@ function describe(shape: MapShape): string {
   if (chats.length > 0) {
     parts.push(`${plural(chats.length, 'branch chat', 'branch chats')}${grouped ? `, ${grouped} grouped by Layers` : ''}`);
   }
+  const stopped = shape.stops?.length ?? 0;
+  if (stopped > 0) parts.push(`${plural(stopped, 'prompt', 'prompts')} stopped along the way`);
   return `${parts.join('. ')}.`;
 }
 
@@ -150,7 +152,26 @@ export function ManagerView() {
   if (!data) {
     return (
       <main className="mgr">
-        <p className="mgr__empty">{offline ? 'The Layers server is not running.' : 'Loading'}</p>
+        {offline ? (
+          <>
+            <header className="mgr__top">
+              <div>
+                <h1>
+                  The manager's page <span>needs the Layers server</span>
+                </h1>
+                <p>
+                  This preview runs without the server, so there is nothing live to show here. With it, this page has
+                  approval requests and their reasons, the rules for the whole team, each person's progress and branch
+                  map, and the audit trail. These two pictures are that page in the full build.
+                </p>
+              </div>
+            </header>
+            <img className="mgr__shot" src="/preview/manager-1.jpg" alt="The manager's page: an approval request with its reason, the rules, and the team." />
+            <img className="mgr__shot" src="/preview/manager-2.jpg" alt="The manager's page: one person's update, activity, progress and branch map." />
+          </>
+        ) : (
+          <p className="mgr__empty">Loading</p>
+        )}
       </main>
     );
   }
@@ -397,8 +418,9 @@ export function ManagerView() {
               <>
                 <BranchMap shape={member.branches} size="small" />
                 <p className="mgr__empty">
-                  {describe(member.branches)} A dot is a prompt, and a number marks coming back to a line. Each line is
-                  named by the part of the project it is on. What {first} typed is not shown.
+                  {describe(member.branches)} A dot is a prompt, a number marks coming back to a line, and a red dead
+                  end is a prompt that was stopped. Each line is named by the part of the project it is on. What{' '}
+                  {first} typed is not shown.
                 </p>
               </>
             ) : (
