@@ -137,7 +137,7 @@ def run() -> None:
     # The layer between workers, and the branch map as the agent's index.
     ways = main.manager()["processes"]
     check("how the team works leaves out other teams",
-          len(ways) >= 4 and not any(w["who"] == "Milton Waddams" for w in ways), [w["who"] for w in ways])
+          len(ways) >= 4 and not any(w["who"] == "Oscar Martinez" for w in ways), [w["who"] for w in ways])
     check("applying a workflow adds the employee's own steps to it",
           any(w["who"] == db.EMPLOYEE["name"] and not w["sample"] for w in ways))
     check("an offered workflow says who already used it",
@@ -160,7 +160,7 @@ def run() -> None:
     check("the chat answers it from the company's records, with no model",
           told["placeholder"] is False and "Pam Beesly" in told["text"] and told["knowledge"]["processes"], told)
     check("another team's work is named as existing, and nothing more",
-          told["knowledge"]["restricted"] == ["Finance"] and "Milton" not in json.dumps(told) and "board deck" not in told["text"].lower(), told)
+          told["knowledge"]["restricted"] == ["Finance"] and "Oscar" not in json.dumps(told) and "board deck" not in told["text"].lower(), told)
 
     # The agent's second job, on plain code here: an update that waits for the employee.
     draft = last(main.draft_update(), "draft")

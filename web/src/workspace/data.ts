@@ -85,7 +85,7 @@ export const teamProcesses: TeamProcess[] = [
     sample: true,
   },
   {
-    who: 'Peter Gibbons',
+    who: 'Jim Halpert',
     project: 'Loyalty study',
     did: 'Built the readout presentation for the loyalty study from the findings',
     path: ['Findings', 'Presentation outline', 'Readout'],
@@ -100,14 +100,14 @@ export const readoutOutline: KnowledgeItem = {
   name: 'ReadoutOutline_v3',
   kind: 'Approved workflow',
   summary: 'Presentation outline for a project readout, with the key point, evidence and owner of each section.',
-  author: 'Peter Gibbons',
+  author: 'Jim Halpert',
   team: 'Strategy',
   reviewedOn: 'Nov 3, 2026',
   approvedBy: manager.name,
   access: 'Shared with Strategy, interns included',
   columns: ['Section', 'Key point', 'Evidence to show', 'Owner'],
   inputs: "The project's findings",
-  usedBy: [{ who: 'Peter Gibbons', project: 'Loyalty study' }],
+  usedBy: [{ who: 'Jim Halpert', project: 'Loyalty study' }],
 };
 
 export const outlineSections = ['Why this matters', 'Who we compared', 'What we found', 'Gaps we can use', 'Recommendation'];
