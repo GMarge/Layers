@@ -156,7 +156,7 @@ export function Intro() {
             Layers
           </p>
           <h1>
-            AI does the work. <span>Layers manages the work.</span>
+            AI helps manage the work. <span>Layers helps manage the AI.</span>
           </h1>
           <p className="intro__sub">
             A management layer on a company's AI workspace. It checks every prompt when you press Send, points to what

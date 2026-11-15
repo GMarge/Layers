@@ -1,6 +1,6 @@
 # Layers
 
-An intelligent management layer for a company's AI workspace. AI does the work; Layers manages the work.
+An intelligent management layer for a company's AI workspace. AI helps manage the work; Layers helps manage the AI.
 
 Built at HackPrinceton, November 13 to 15, 2026. Track: Business and Enterprise.
 
