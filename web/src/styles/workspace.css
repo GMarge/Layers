@@ -1,0 +1,776 @@
+/* The company AI workspace that Layers sits on top of. Neutral on purpose. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root,
+.root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--font-ui);
+  font-stretch: var(--w-normal);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-stretch: 88%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  height: 100dvh;
+}
+
+/* Focus layout: the chat on its own, no sidebar. */
+.app[data-layout='focus'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app[data-layout='focus'] .side {
+  display: none;
+}
+
+/* Sidebar */
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 14px 20px 22px;
+  border-right: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.side p,
+.side ul {
+  margin: 0;
+}
+
+.side__brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 24px;
+  font-weight: 650;
+  font-size: 14.5px;
+}
+
+.side__glyph {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.side__label {
+  padding: 0 8px 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.side__nav ul {
+  display: grid;
+  gap: 1px;
+  padding: 0;
+  list-style: none;
+}
+
+.side__nav li {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.side__nav li[aria-current] {
+  background: var(--well);
+  color: var(--ink);
+  font-weight: 560;
+}
+
+.side__foot {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+}
+
+.side__user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.side__user > span:last-child {
+  display: grid;
+}
+
+.side__user b {
+  font-weight: 600;
+}
+
+.side__user span span {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+
+.side__avatar {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--well-press);
+  font-size: 11.5px;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+
+.side__fine {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+
+/* Main column */
+
+.main {
+  display: grid;
+  grid-template-rows: 56px minmax(0, 1fr) auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar h1 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 620;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Project chip and brief */
+
+.proj {
+  position: relative;
+  flex: none;
+}
+
+.proj__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 9px 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  transition: background var(--t-fast);
+}
+
+.proj__chip:hover,
+.proj__chip[aria-expanded='true'] {
+  background: var(--canvas);
+}
+
+.proj__chip b {
+  font-weight: 650;
+}
+
+.proj__title {
+  color: var(--ink-2);
+}
+
+.proj__count {
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  animation: count-flash 1.4s var(--ease-out);
+}
+
+@keyframes count-flash {
+  0% {
+    color: var(--agent);
+  }
+  60% {
+    color: var(--agent);
+  }
+}
+
+.proj__chip svg {
+  color: var(--ink-3);
+}
+
+.proj__pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  gap: 10px;
+  width: 320px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  font-size: 13.5px;
+  animation: pop-in 180ms var(--ease-out);
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.proj__pop p,
+.proj__pop ul {
+  margin: 0;
+}
+
+.proj__pop ul {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.proj__head b {
+  font-weight: 650;
+  margin-right: 4px;
+}
+
+.proj__meta,
+.proj__sub {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.proj__meta {
+  margin-top: -6px !important;
+}
+
+.proj__sub {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.proj__tasks li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: center;
+  gap: 9px;
+}
+
+.proj__tasks em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.proj__mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  color: var(--surface);
+}
+
+li[data-status='done'] .proj__mark {
+  border-color: var(--ink);
+  background: var(--ink);
+}
+
+li[data-status='doing'] .proj__mark {
+  border-color: var(--ink);
+  background: radial-gradient(circle, var(--ink) 0 3px, transparent 3.5px);
+}
+
+li[data-status='done'] {
+  color: var(--ink-3);
+}
+
+.proj__rules li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.proj__rules code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--well);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+/* Thread */
+
+.thread {
+  overflow-y: auto;
+  /* --reserve is the room Layers asks for above the chat box, so it never covers a message. */
+  padding: 28px 24px calc(40px + var(--reserve, 0px));
+}
+
+.thread__col {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.msg p,
+.msg ol {
+  margin: 0;
+}
+
+.msg--user {
+  align-self: flex-end;
+  max-width: 78%;
+  padding: 10px 14px;
+  border-radius: 16px 16px 4px 16px;
+  background: var(--well);
+}
+
+.msg__who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 4px !important;
+  font-size: 12.5px;
+  font-weight: 620;
+  color: var(--ink-3);
+}
+
+.msg--layers .msg__who {
+  color: var(--agent-ink);
+  font-stretch: var(--w-wide);
+}
+
+/* A tiny version of the mascot: blue tile, two eyes. */
+.msg__mark {
+  width: 16px;
+  height: 16px;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at 35% 52%, var(--eye) 0 1.5px, transparent 1.9px),
+    radial-gradient(circle at 65% 52%, var(--eye) 0 1.5px, transparent 1.9px), var(--agent);
+}
+
+.msg__text {
+  text-wrap: pretty;
+}
+
+.msg__text--quiet {
+  color: var(--ink-3);
+}
+
+.msg__list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px !important;
+  padding: 0;
+  list-style: none;
+}
+
+.msg__list li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: 6px;
+}
+
+.msg__list b {
+  font-weight: 640;
+}
+
+.msg__n {
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.msg--layers {
+  animation: land 420ms var(--ease-out);
+}
+
+@keyframes land {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+/* The sheet Layers adds to the project */
+
+.sheet {
+  margin: 10px 0 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.sheet__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sheet__head b {
+  font-weight: 640;
+}
+
+.sheet__head span {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.sheet__scroll {
+  overflow-x: auto;
+}
+
+.sheet table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet th,
+.sheet td {
+  height: 34px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.sheet tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.sheet thead th {
+  font-weight: 560;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  background: var(--canvas);
+}
+
+.sheet tbody th {
+  font-weight: 560;
+}
+
+.sheet td + td,
+.sheet th + th,
+.sheet th + td {
+  border-left: 1px solid var(--line);
+}
+
+/* Composer */
+
+.dock {
+  padding: 0 24px 16px;
+}
+
+.composer,
+.dock__note {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.composer {
+  padding: 6px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(19 19 22 / 0.05);
+  transition:
+    border-color var(--t-fast),
+    box-shadow var(--t-med);
+}
+
+.composer:focus-within {
+  border-color: var(--ink-3);
+}
+
+/*
+ * The agent is inside the chat box: the box wears its colours. The outline is a ring
+ * laid over the border so it can fade in and out, and its colour flows out from where
+ * the droplet landed.
+ */
+@property --reveal {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 100%;
+}
+
+.composer {
+  position: relative;
+}
+
+.composer::after {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  padding: 1.5px;
+  border-radius: 16px;
+  background: linear-gradient(
+    100deg,
+    var(--agent) 0,
+    var(--agent) calc(var(--reveal) * 0.28),
+    var(--layer-pink) calc(var(--reveal) * 0.6),
+    var(--layer-red) calc(var(--reveal) * 0.82),
+    var(--layer-orange) var(--reveal),
+    transparent var(--reveal)
+  );
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 500ms var(--ease-out);
+}
+
+.root[data-outline='blue'] .composer::after {
+  background: linear-gradient(100deg, var(--agent) 0, var(--agent) var(--reveal), transparent var(--reveal));
+}
+
+.composer[data-layers='in']::after {
+  opacity: 1;
+  animation: outline-flow 900ms var(--ease-out) 300ms backwards;
+}
+
+.composer[data-layers='in'] {
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--agent) 10%, transparent),
+    0 8px 26px -10px color-mix(in srgb, var(--agent) 45%, transparent);
+  transition:
+    border-color var(--t-fast),
+    box-shadow 500ms var(--ease-out);
+}
+
+@keyframes outline-flow {
+  from {
+    --reveal: 0%;
+  }
+}
+
+.composer__hold {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  padding: 7px 8px 7px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--layer-orange) 13%, var(--surface));
+  font-size: 12.5px;
+  animation: pop-in 220ms var(--ease-out);
+}
+
+.composer__hold[data-kind='reuse'] {
+  background: var(--agent-tint);
+}
+
+.composer__dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--layer-orange);
+}
+
+[data-kind='reuse'] .composer__dot {
+  background: var(--agent);
+}
+
+.composer__hold button {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.composer__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-left: 12px;
+}
+
+.composer textarea {
+  flex: 1;
+  min-height: 36px;
+  max-height: 168px;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  line-height: 1.45;
+  field-sizing: content;
+}
+
+.composer textarea::placeholder {
+  color: var(--ink-3);
+}
+
+.composer__send {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ink);
+  color: var(--surface);
+  transition:
+    background var(--t-fast),
+    transform var(--t-fast);
+}
+
+.composer__send:active {
+  transform: scale(0.94);
+}
+
+.composer__send:disabled {
+  background: var(--well);
+  color: var(--ink-3);
+  cursor: default;
+}
+
+.dock__note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+  text-align: center;
+  text-wrap: balance;
+}
+
+.dock__note button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+:where(.app) :focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.composer textarea:focus-visible {
+  outline: 0;
+}
+
+@media (max-width: 760px) {
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side {
+    display: none;
+  }
+
+  .topbar {
+    padding: 0 16px;
+  }
+
+  .thread {
+    padding: 20px 16px calc(40px + var(--reserve, 0px));
+  }
+
+  .dock {
+    padding: 0 16px 14px;
+  }
+
+  .proj__title {
+    display: none;
+  }
+
+  .msg--user {
+    max-width: 88%;
+  }
+}

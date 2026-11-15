@@ -1,0 +1,48 @@
+/*
+ * Layers design tokens.
+ * Change a value here and the whole product follows. See DESIGN.md for the reasoning.
+ */
+:root {
+  /* Type: one family. Normal width is the workspace, wide is Layers speaking. */
+  --font-ui: 'Archivo Variable', 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'Martian Mono Variable', ui-monospace, 'SF Mono', Menlo, monospace;
+  --w-normal: 100%;
+  --w-wide: 116%;
+
+  /* Workspace neutrals. The host product stays grey so that blue always means Layers. */
+  --ink: #131316;
+  --ink-2: #3f3f48;
+  --ink-3: #6b6b76;
+  --line: #e4e4ea;
+  --line-strong: #cfcfd8;
+  --surface: #ffffff;
+  --canvas: #f5f5f8;
+  --well: #eeeef3;
+  --well-press: #e3e3ea;
+
+  /* Layers. Blue is the agent; the other three are the logo's layers, in its exact colours. */
+  --agent: #2b63ff;
+  --agent-press: #1f4fd6;
+  --agent-tint: #eaf0ff;
+  --agent-ink: #173a9e;
+  --eye: #0e0e12;
+  --layer-pink: #ff1fd2; /* ambient, and the agent acting */
+  --layer-red: #ff3d2e; /* a held prompt */
+  --layer-orange: #ff9a14; /* a rule or workflow intervention */
+
+  /* Radius. Nested corners follow inner = outer - padding. */
+  --r-bubble: 18px;
+  --r-control: 12px;
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --t-fast: 140ms;
+  --t-med: 260ms;
+  --t-slow: 640ms;
+
+  /* Elevation */
+  --shadow-bubble:
+    0 1px 1px rgb(19 19 22 / 0.04), 0 6px 14px rgb(19 19 22 / 0.07), 0 22px 44px rgb(19 19 22 / 0.11);
+  --shadow-pop: 0 1px 1px rgb(19 19 22 / 0.04), 0 10px 28px rgb(19 19 22 / 0.11);
+}
