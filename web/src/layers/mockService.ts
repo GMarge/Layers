@@ -1,5 +1,13 @@
-import { assignedWorkRule, competitorMatrix, competitors, manager, project } from '../workspace/data';
-import type { AskAnswer, LayersService, Step, Verdict } from './types';
+import {
+  assignedWorkRule,
+  competitorMatrix,
+  competitors,
+  manager,
+  outlineSections,
+  project,
+  readoutOutline,
+} from '../workspace/data';
+import type { AskAnswer, KnowledgeItem, LayersService, Step, Verdict } from './types';
 
 /**
  * Scripted stand-in for the Layers API. Nothing here calls a model.
@@ -16,7 +24,11 @@ const OFF_TOPIC =
 const ON_PROJECT =
   /\b(competitors?|competitive|comparison|compares?|pricing|market|analysis|project x|stocksmith|pantryline|crateworks|tallyhouse|larder|presentation|deck|slides|findings|grocers?|inventory)\b/i;
 const REBUILD =
-  /\b(build|create|make|generate|write|set up|automate)\b[\s\S]*\b(spreadsheet|excel|sheet|matrix|table|template|workflow|automation)\b/i;
+  /\b(build|create|make|generate|write|set up|automate)\b[\s\S]*\b(spreadsheet|excel|sheet|matrix|table|template|workflow|automation|outline)\b/i;
+const ABOUT_DECK = /\b(outline|presentation|deck|slides|readout)\b/i;
+
+/** The approved team workflow that fits a request. */
+const workflowFor = (text: string): KnowledgeItem => (ABOUT_DECK.test(text) ? readoutOutline : competitorMatrix);
 
 const VAGUE = /\b(budget|offsite|email|schedule)\b/i;
 
@@ -49,11 +61,8 @@ function classify(prompt: string): Verdict {
     };
   }
   if (REBUILD.test(prompt) && ON_PROJECT.test(prompt)) {
-    return {
-      kind: 'reuse',
-      item: competitorMatrix,
-      reason: `${competitorMatrix.author} already built a comparison workflow for this.`,
-    };
+    const item = workflowFor(prompt);
+    return { kind: 'reuse', item, reason: `${item.author} already built a workflow for this.` };
   }
   if (OFF_TOPIC.test(prompt) && !ON_PROJECT.test(prompt)) {
     return {
@@ -78,10 +87,8 @@ function answer(question: string): AskAnswer {
     };
   }
   if (ASKS_EXISTING.test(question)) {
-    return {
-      text: `Yes. ${competitorMatrix.author} built one, it is approved, and you have access.`,
-      item: competitorMatrix,
-    };
+    const item = workflowFor(question);
+    return { text: `Yes. ${item.author} built one, it is approved, and you have access.`, item };
   }
   if (OFF_TOPIC.test(question) || PERSONAL.test(question)) {
     return {
@@ -98,12 +105,12 @@ function answer(question: string): AskAnswer {
   };
 }
 
-const PLAN = [
+const planFor = (item: KnowledgeItem, rows: number) => [
   {
     id: 's1',
     tool: 'search_org_memory',
     label: "Finding your team's approved workflow",
-    detail: competitorMatrix.name,
+    detail: item.name,
     ms: 900,
   },
   {
@@ -116,18 +123,20 @@ const PLAN = [
   {
     id: 's3',
     tool: 'create_project_artifact',
-    label: `Building the ${project.name} comparison sheet`,
-    detail: `${competitors.length} rows, ${competitorMatrix.columns.length} columns`,
+    label: `Building it in ${project.name}`,
+    detail: `${rows} rows, ${item.columns.length} columns`,
     ms: 1100,
   },
   {
     id: 's4',
     tool: 'update_task_status',
     label: `Updating your ${project.name} tasks`,
-    detail: 'spreadsheet task in progress',
+    detail: 'task in progress',
     ms: 700,
   },
 ];
+
+const PLAN = planFor(competitorMatrix, competitors.length);
 
 const stepOf = (p: (typeof PLAN)[number], status: Step['status']): Step => ({
   id: p.id,
@@ -161,8 +170,11 @@ export function createMockService(speed: () => number = () => 1): LayersService 
       return verdict;
     },
 
-    async applyWorkflow(_itemId, _prompt, onEvent, signal) {
-      for (const p of PLAN) {
+    async applyWorkflow(itemId, _prompt, onEvent, signal) {
+      const outline = itemId === readoutOutline.id;
+      const item = outline ? readoutOutline : competitorMatrix;
+      const first = outline ? outlineSections : competitors.map(([name]) => name);
+      for (const p of planFor(item, first.length)) {
         if (signal.aborted) return;
         onEvent({ type: 'step', step: stepOf(p, 'running') });
         await wait(p.ms * speed());
@@ -171,16 +183,18 @@ export function createMockService(speed: () => number = () => 1): LayersService 
       }
       onEvent({
         type: 'result',
-        summary: `Comparison sheet added to ${project.name}.`,
-        detail: `The ${competitors.length} competitors from this thread are filled in. "Build comparison spreadsheet" is now in progress.`,
-        taskId: 't3',
+        summary: `${outline ? 'Presentation outline' : 'Comparison sheet'} added to ${project.name}.`,
+        detail: outline
+          ? `Its ${first.length} sections are laid out and ready to fill in. "Draft presentation" is now in progress.`
+          : `The ${first.length} competitors from this project are filled in. "Build comparison spreadsheet" is now in progress.`,
+        taskId: outline ? 't4' : 't3',
         artifact: {
           id: `sheet-${Date.now().toString(36)}`,
-          title: `${project.name} competitor matrix`,
-          source: competitorMatrix.name,
-          author: competitorMatrix.author,
-          columns: competitorMatrix.columns,
-          rows: competitors.map(([name]) => [name, '', '', '', '']),
+          title: `${project.name} ${outline ? 'readout outline' : 'competitor matrix'}`,
+          source: item.name,
+          author: item.author,
+          columns: item.columns,
+          rows: first.map((name) => [name, ...item.columns.slice(1).map(() => '')]),
         },
       });
     },

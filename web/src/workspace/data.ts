@@ -60,6 +60,22 @@ export const competitorMatrix: KnowledgeItem = {
   inputs: 'A list of competitor names',
 };
 
+export const readoutOutline: KnowledgeItem = {
+  id: 'wf-readout-outline-v3',
+  name: 'ReadoutOutline_v3',
+  kind: 'Approved workflow',
+  summary: 'Presentation outline for a project readout, with the key point, evidence and owner of each section.',
+  author: 'Elena Ruiz',
+  team: 'Strategy',
+  reviewedOn: 'Nov 3, 2026',
+  approvedBy: manager.name,
+  access: 'Shared with Strategy, interns included',
+  columns: ['Section', 'Key point', 'Evidence to show', 'Owner'],
+  inputs: "The project's findings",
+};
+
+export const outlineSections = ['Why this matters', 'Who we compared', 'What we found', 'Gaps we can use', 'Recommendation'];
+
 export const conversations = ['Competitor shortlist', 'Pricing page teardown', 'Customer interview notes'];
 
 export const seedMessages: Message[] = [
@@ -80,5 +96,6 @@ export const examplePrompts = {
   offTopic: 'Plan my ski vacation this weekend',
   rebuild: 'Build me an Excel automation that compares our five competitors',
   unsure: 'Draft an email to Priya with my status update',
+  outline: 'Create a presentation outline for the Project X readout',
   onTopic: 'Summarize how Stocksmith and Pantryline price their plans',
 };

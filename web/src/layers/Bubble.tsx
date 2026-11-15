@@ -509,6 +509,7 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
                   So I gave it a chat of its own and moved its prompts there together. {scene.from} carries on without
                   them.
                 </p>
+                {scene.evidence && <p className="b-fine">{scene.evidence}</p>}
                 <button type="button" className="b-link" onClick={a.openBranches}>
                   See the branch map
                 </button>
@@ -538,6 +539,7 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
                   Want it as a chat of its own? Its prompts move there together, and {scene.from} carries on without
                   them.
                 </p>
+                {scene.evidence && <p className="b-fine">{scene.evidence}</p>}
                 <button type="button" className="b-link" onClick={a.openBranches}>
                   See the branch map
                 </button>

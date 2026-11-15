@@ -343,6 +343,137 @@
   grid-template-columns: 1fr;
 }
 
+/* Rules the manager sets. A change reaches every workspace within a couple of seconds. */
+
+.mgr__rules {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.mgr__rule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 14px 10px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
+
+.mgr__rule:last-child {
+  border-bottom: 0;
+}
+
+.mgr__rule b {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.mgr__rule code {
+  margin-right: 8px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--well);
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+.mgr__seg {
+  display: flex;
+  flex: none;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--well);
+}
+
+/* The option sits 3px inside its track, so its radius is 11 - 3. */
+.mgr__seg button {
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.mgr__seg button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(19 19 22 / 0.12);
+}
+
+.mgr__on {
+  flex: none;
+  padding-right: 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+/* The audit trail: one line per thing that happened. */
+
+.mgr__more {
+  margin-left: auto;
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--well);
+  font-size: 12.5px;
+  font-weight: 560;
+}
+
+.mgr__more:hover {
+  background: var(--well-press);
+}
+
+.mgr__audit {
+  display: grid;
+  padding: 4px 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  list-style: none;
+  font-size: 13px;
+}
+
+.mgr__audit li {
+  display: grid;
+  grid-template-columns: 84px 110px minmax(0, 1fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 14px;
+}
+
+.mgr__audit li:nth-child(even) {
+  background: var(--canvas);
+}
+
+.mgr__audit time {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.mgr__audit b {
+  font-weight: 600;
+}
+
+.mgr__audit code {
+  overflow: hidden;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .mgr__fine {
   padding-top: 16px;
   border-top: 1px solid var(--line);
@@ -367,6 +498,20 @@
 
   .mgr__proj {
     min-height: 0;
+  }
+
+  .mgr__rule {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .mgr__seg {
+    flex-wrap: wrap;
+  }
+
+  .mgr__audit li {
+    grid-template-columns: 76px minmax(0, 1fr);
   }
 }
 

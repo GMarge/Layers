@@ -654,6 +654,20 @@ button.bmap__dot:hover::after,
   outline-offset: 1px;
 }
 
+.side__fine button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.side__fine button:hover {
+  color: var(--ink);
+}
+
 /* Top bar: which chat this is, and the way into the map. */
 
 /* The title stops short of the middle of the bar, where the demo's view switcher sits. */

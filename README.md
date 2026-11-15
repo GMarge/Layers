@@ -10,12 +10,15 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 
 - **On project:** it goes straight through, and Layers stays quiet.
 - **Off project:** it is held. Layers names the rule, shows the words that triggered it, and offers a way back or a request to the manager.
-- **Already built:** if the team has an approved workflow for the request, Layers offers it and, on a click, applies it to the project.
+- **Already built:** if the team has an approved workflow for the request, Layers offers it and, on a click, applies it to the project. Two are set up for this project: a competitor comparison sheet and a presentation outline. Each moves its own task along.
 - **Not sure:** Layers says so, shows what counted each way, and follows the company's choice: ask the employee, let it through and log it, or hand it to a person.
 
-- **Branches:** when the conversation moves to a different part of the project, Layers gives that direction its own line without being asked (an implicit branch). When the employee keeps coming back to the same direction, Layers moves it into a chat of its own (an explicit branch), listed under the chat it came from, and says so with a one-key undo. The employee can also start a chat from any earlier prompt, merge lines back one at a time or all at once, and put a chat back where it came from. Each chat only gives the model its own history plus what it shared before it split.
+- **Branches:** when the conversation moves to a different part of the project, Layers gives that direction its own line without being asked (an implicit branch). When the employee keeps coming back to the same direction, Layers moves it into a chat of its own (an explicit branch), listed under the chat it came from, and says so with a one-key undo. One return is enough when that direction is a third of the chat or more; a small aside has to grow to three prompts or be returned to twice. Layers shows the numbers it went on. The employee can also start a chat from any earlier prompt, merge lines back one at a time or all at once, and put a chat back where it came from. Each chat only gives the model its own history plus what it shared before it split.
 - **The branch map:** right-click the agent, or use the Branches button, for a page that draws the conversation: one row per line, one dot per prompt, a number where the employee came back to a line, and a zigzag for a long unbroken run. A second tab, "Today so far", reads progress from the branches and the task list.
-- **The manager's view** (`#manager`): approval requests with the reason and the words that triggered them, then the team, then one person at a time with their activity, task progress and branch map.
+- **The manager's view** (`#manager`): approval requests with the reason and the words that triggered them, the rules, the team, then one person at a time with their activity, task progress and branch map.
+- **The manager sets the rules:** what happens to an off-project prompt (held for approval, or a warning) and to an unclear one (ask the employee, send and log, or send to the manager). A change reaches every open workspace within two seconds and tells the employee.
+- **Audit trail:** the manager's page lists every check, tool call and decision with who did it, when and how long it took. What the employee typed is left out.
+- **Nothing is lost on a refresh:** the conversation, its branches, the task progress and a request waiting on the manager are kept on the employee's device.
 
 The employee can also ask Layers a question before sending anything, move it, hide it, rename it, and change how it looks.
 
@@ -59,10 +62,10 @@ Check the agent wiring without a key: `.venv/bin/python -m tests.test_agent_wiri
 
 | | |
 |---|---|
-| Real | The gate, the tools, the database, approvals and the manager's view of them, the audit log, the adaptive word list, the branch map and chats, the DeepAgents harness (tested with a stand-in model) |
+| Real | The gate, the tools, the database, approvals and the manager's view of them, rules set by the manager, the audit trail, the adaptive word list, the branch map and chats, two team workflows, the DeepAgents harness (tested with a stand-in model) |
 | Needs a model key | The agent's own judgment on unclear prompts, its reading of which direction a prompt belongs to, and answers from the workspace model |
 | Seeded | The company, people, project, rules and workflows are fictional demo data. On the manager's page one employee is live; the two teammates marked "Sample" are example data |
-| Not built | Running over ChatGPT or other tools, real accounts and sign-in, keeping chats after a refresh, more than one live employee or project |
+| Not built | Running over ChatGPT or other tools, real accounts and sign-in, more than one live employee or project, chats that follow the employee to another device |
 
 No time or money savings are claimed. The only numbers shown are counts and tool timings measured in the session.
 

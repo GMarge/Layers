@@ -66,6 +66,19 @@ export const TOPICS: { id: string; label: string; task: string; match: RegExp }[
 /** How many visits to an implicit line before Layers gives it a chat of its own. */
 export const PROMOTE_AFTER = 2;
 
+/**
+ * Whether a noticed direction has earned a chat of its own. Coming back to it once is
+ * enough when it is a real share of the conversation. A small aside has to grow to three
+ * prompts, or be returned to twice, first.
+ */
+export function earnsChat(tree: Tree, line: Line): boolean {
+  if (line.kind !== 'implicit' || line.settled || line.visits < PROMOTE_AFTER) return false;
+  const chat = chatOf(tree, line.id);
+  const mine = tree.nodes.filter((n) => n.line === line.id).length;
+  const all = tree.nodes.filter((n) => chatOf(tree, n.line) === chat).length;
+  return line.visits > PROMOTE_AFTER || mine >= 3 || mine * 3 >= all;
+}
+
 export const topicOf = (text: string): string | null => TOPICS.find((t) => t.match.test(text))?.id ?? null;
 export const topicLabel = (id: string | null): string => TOPICS.find((t) => t.id === id)?.label ?? 'New direction';
 export const lineLabel = (line: Line): string => line.label ?? topicLabel(line.topic);

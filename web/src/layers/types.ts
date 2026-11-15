@@ -160,6 +160,8 @@ export interface LayersService {
   decide?(requestId: string, approved: boolean): Promise<void>;
   /** Tell the server what the company has chosen. The server enforces it. */
   sync?(settings: { policyMode: PolicyMode; unsureMode: UnsureMode }): Promise<void>;
+  /** What the company has chosen, as the server has it. The manager can change it. */
+  settings?(): Promise<{ policyMode: PolicyMode; unsureMode: UnsureMode }>;
   reset?(): Promise<void>;
   /** Where an approval request stands, so the employee's side updates when the manager answers. */
   approvalStatus?(requestId: string): Promise<'pending' | 'approved' | 'declined'>;
@@ -181,6 +183,8 @@ export type Scene =
       what: 'noticed' | 'moved' | 'offer';
       /** The chat it split off from. */
       from: string;
+      /** What made Layers act: how much of the chat it is, over how many visits. */
+      evidence?: string;
     }
   | { name: 'policy'; prompt: string; rule: Rule; reason: string; signals: Signals; showRule: boolean }
   | { name: 'unsure'; prompt: string; rule: Rule; reason: string; signals: Signals }

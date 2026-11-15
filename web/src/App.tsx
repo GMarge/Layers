@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { BranchPanel, type PanelTab } from './branches/BranchPanel';
 import {
-  PROMOTE_AFTER,
   addPrompt,
   branchFrom,
   chatOf,
   chatTitle,
   chatsOf,
+  earnsChat,
   fold,
   isVisible,
   lastLineIn,
@@ -36,13 +36,57 @@ import { EdgeGlow, type GlowMode } from './layers/EdgeGlow';
 import { connect, type BackendStatus } from './layers/apiService';
 import { createMockService, previewSteps } from './layers/mockService';
 import { Toast, type ToastState } from './layers/Toast';
-import type { Counters, Hold, KnowledgeItem, Message, RestMode, Scene, Step, Task, Verdict } from './layers/types';
+import type {
+  Counters,
+  Hold,
+  KnowledgeItem,
+  Message,
+  PolicyMode,
+  RestMode,
+  Scene,
+  Step,
+  Task,
+  UnsureMode,
+  Verdict,
+} from './layers/types';
 import { useMediaQuery } from './ui/useMediaQuery';
 import { competitorMatrix, conversations, examplePrompts, manager, project, seedMessages, seedTasks } from './workspace/data';
 import { Workspace, type ForkMark } from './workspace/Workspace';
 
 /** What the first chat is called. Branches that become chats are named after their direction. */
 const ROOT_TITLE = conversations[0]!;
+
+const SESSION_KEY = 'layers.session.v1';
+
+/** What survives a refresh: the conversation, its branches, the tasks and the counts. */
+interface Saved {
+  messages: Message[];
+  tree: Tree;
+  tasks: Task[];
+  counters: Counters;
+  seq: number;
+  /** When this was written, so a workspace coming back on screen can tell if it is behind. */
+  at: number;
+  /** A request that was with the manager when the page closed. */
+  pending?: Extract<Scene, { name: 'pending' }>;
+}
+
+function loadSession(): Saved | null {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) ?? 'null') as Saved | null;
+    const sound =
+      !!s &&
+      Array.isArray(s.messages) &&
+      Array.isArray(s.tasks) &&
+      Array.isArray(s.tree?.lines) &&
+      Array.isArray(s.tree?.nodes) &&
+      s.tree.lines.every((l) => typeof l.visits === 'number') &&
+      typeof s.seq === 'number';
+    return sound ? s : null;
+  } catch {
+    return null;
+  }
+}
 
 const NO_COUNTS: Counters = { checked: 0, held: 0, reused: 0 };
 const GLOW: Record<GlowLevel, number> = { soft: 0.6, standard: 1, bold: 1.5 };
@@ -110,14 +154,20 @@ function announce(scene: Scene, name: string): string {
  * manager's page. A workspace nobody is using must not tell the server anything.
  */
 export default function App({ active = true }: { active?: boolean }) {
-  const [messages, setMessages] = useState<Message[]>(seedMessages);
-  const [tasks, setTasks] = useState<Task[]>(seedTasks);
-  const [draft, setDraft] = useState('');
-  const [hold, setHold] = useState<Hold | null>(null);
+  // Whatever was saved the last time this workspace was open, so a refresh loses nothing.
+  const [saved] = useState(loadSession);
+  const [messages, setMessages] = useState<Message[]>(saved?.messages ?? seedMessages);
+  const [tasks, setTasks] = useState<Task[]>(saved?.tasks ?? seedTasks);
+  const [draft, setDraft] = useState(saved?.pending?.prompt ?? '');
+  const [hold, setHold] = useState<Hold | null>(
+    saved?.pending
+      ? { kind: 'pending', label: `Waiting on ${saved.pending.approver}. Request ${saved.pending.requestId}.` }
+      : null,
+  );
   const [setAside, setSetAside] = useState<string | null>(null);
-  const [scene, setScene] = useState<Scene>({ name: 'ambient' });
+  const [scene, setScene] = useState<Scene>(saved?.pending ?? { name: 'ambient' });
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [counters, setCounters] = useState<Counters>(NO_COUNTS);
+  const [counters, setCounters] = useState<Counters>(saved?.counters ?? NO_COUNTS);
   const [nod, setNod] = useState(0);
   /** True while the agent is melted into the chat box. */
   const [absorbed, setAbsorbed] = useState(false);
@@ -171,8 +221,43 @@ export default function App({ active = true }: { active?: boolean }) {
   }, []);
 
   // The company's choices live on the server, which is what actually enforces them.
+  // The manager can change them from their page, so this workspace reads them back and follows.
+  const known = useRef<{ policyMode: PolicyMode; unsureMode: UnsureMode } | null>(null);
+  /** Just after a change made here, an older answer from the server is not allowed to undo it. */
+  const quietUntil = useRef(0);
   useEffect(() => {
-    if (active) void service.sync?.({ policyMode: lab.policyMode, unsureMode: lab.unsureMode });
+    if (!active || !service.settings) return;
+    const read = service.settings;
+    let live = true;
+    const pull = () =>
+      void read()
+        .then((s) => {
+          if (!live || Date.now() < quietUntil.current) return;
+          const before = known.current;
+          known.current = s;
+          setLab((l) => (l.policyMode === s.policyMode && l.unsureMode === s.unsureMode ? l : { ...l, ...s }));
+          if (before && (before.policyMode !== s.policyMode || before.unsureMode !== s.unsureMode)) {
+            setToast({ id: Date.now(), text: `${manager.first} changed a workspace rule. It applies from your next prompt.` });
+          }
+        })
+        .catch(() => {});
+    pull();
+    const timer = setInterval(pull, 2000);
+    return () => {
+      live = false;
+      clearInterval(timer);
+    };
+  }, [active, service]);
+
+  useEffect(() => {
+    if (!active || !service.sync) return;
+    // Until the server's own choices have been read, there is nothing here worth sending.
+    if (service.settings && !known.current) return;
+    const k = known.current;
+    if (k && k.policyMode === lab.policyMode && k.unsureMode === lab.unsureMode) return;
+    known.current = { policyMode: lab.policyMode, unsureMode: lab.unsureMode };
+    quietUntil.current = Date.now() + 2500;
+    void service.sync({ policyMode: lab.policyMode, unsureMode: lab.unsureMode });
   }, [active, service, lab.policyMode, lab.unsureMode]);
 
   /** The latest thing told to the server. Sending waits for it, so the gate sees it first. */
@@ -186,12 +271,12 @@ export default function App({ active = true }: { active?: boolean }) {
   const sidebarHidden = useMediaQuery('(max-width: 760px)');
 
   // The shape of the conversation: which prompts sit on which branch.
-  const [tree, setTree] = useState<Tree>(() => seedTree(seedMessages[0]!.text ?? ''));
+  const [tree, setTree] = useState<Tree>(() => saved?.tree ?? seedTree(seedMessages[0]!.text ?? ''));
   const treeRef = useRef(tree);
   treeRef.current = tree;
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
-  const seq = useRef(seedMessages.length);
+  const seq = useRef(saved?.seq ?? seedMessages.length);
   const branchModeRef = useRef(lab.branchMode);
   branchModeRef.current = lab.branchMode;
 
@@ -241,7 +326,7 @@ export default function App({ active = true }: { active?: boolean }) {
     let next = added.tree;
     const back = added.returned;
     // Coming back to the same noticed direction again: it has earned a chat of its own.
-    const ripe = !!back && !back.settled && back.visits >= PROMOTE_AFTER;
+    const ripe = !!back && earnsChat(added.tree, back);
     const quiet = branchModeRef.current === 'auto';
     const from = back?.parent ? titleOf(back.parent) : ROOT_TITLE;
     if (back && ripe && quiet) next = promote(next, back.id, true);
@@ -252,7 +337,11 @@ export default function App({ active = true }: { active?: boolean }) {
         if (sceneRef.current.name === 'ambient') setScene(scene);
       }, 700);
     if (back && ripe) {
-      say({ name: 'branch', lineId: back.id, label: lineLabel(back), what: quiet ? 'moved' : 'offer', from });
+      const mine = added.tree.nodes.filter((n) => n.line === back.id).length;
+      const chat = chatOf(added.tree, back.id);
+      const all = added.tree.nodes.filter((n) => chatOf(added.tree, n.line) === chat).length;
+      const evidence = `It is ${mine} of the ${all} prompts in ${from}, over ${back.visits} visits.`;
+      say({ name: 'branch', lineId: back.id, label: lineLabel(back), what: quiet ? 'moved' : 'offer', from, evidence });
     } else if (added.routed) {
       notify(`That belongs with ${lineLabel(added.routed)}, so it went to that chat.`);
     } else if (added.branched && !quiet) {
@@ -534,7 +623,8 @@ export default function App({ active = true }: { active?: boolean }) {
   if (hold?.kind !== 'pending') watchedId.current = null;
   const watching = hold?.kind === 'pending' ? watchedId.current : null;
   useEffect(() => {
-    if (!watching || !service.approvalStatus) return;
+    // Only the workspace on screen watches, so one approval is never acted on twice.
+    if (!active || !watching || !service.approvalStatus) return;
     const check = service.approvalStatus;
     const timer = setInterval(() => {
       void check(watching).then((status) => {
@@ -542,7 +632,7 @@ export default function App({ active = true }: { active?: boolean }) {
       });
     }, 1500);
     return () => clearInterval(timer);
-  }, [watching, service]);
+  }, [active, watching, service]);
 
   const runWorkflow = async (item: KnowledgeItem, prompt: string, instant = false) => {
     const token = ++run.current;
@@ -573,7 +663,7 @@ export default function App({ active = true }: { active?: boolean }) {
         }
         post({
           role: 'layers',
-          text: `Reused ${item.name} instead of generating a new sheet.`,
+          text: `Reused ${item.name} instead of generating a new one.`,
           artifact: e.artifact,
         });
         setTasks((ts) => ts.map((t) => (t.id === e.taskId ? { ...t, status: 'doing' } : t)));
@@ -623,7 +713,7 @@ export default function App({ active = true }: { active?: boolean }) {
     setTasks((ts) => ts.map((t) => (t.id === s.taskId ? { ...t, status: 'todo' } : t)));
     setCounters((c) => ({ ...c, reused: Math.max(0, c.reused - 1) }));
     setScene({ name: 'ambient' });
-    notify('Removed the sheet and reset the task.');
+    notify('Removed it and reset the task.');
   };
 
   const buildAnyway = () => {
@@ -708,6 +798,48 @@ export default function App({ active = true }: { active?: boolean }) {
     unsureMode: lab.unsureMode,
     name,
   };
+
+  // Keep the conversation on this device, so a refresh or a change of view brings it back.
+  const stamp = useRef(saved?.at ?? 0);
+  const adopted = useRef(false);
+  const wasActive = useRef(active);
+  useEffect(() => {
+    const back = active && !wasActive.current;
+    wasActive.current = active;
+    if (!back) return;
+    // Another copy of this workspace (the side-by-side view) may have moved on since.
+    const s = loadSession();
+    if (!s || s.at <= stamp.current) return;
+    stamp.current = s.at;
+    adopted.current = true;
+    setMessages(s.messages);
+    messagesRef.current = s.messages;
+    seq.current = s.seq;
+    changeTree(s.tree);
+    setTasks(s.tasks);
+    setCounters(s.counters);
+  }, [active]);
+  useEffect(() => {
+    if (!active) return;
+    if (adopted.current) {
+      adopted.current = false;
+      return;
+    }
+    const waiting =
+      scene.name === 'pending'
+        ? scene
+        : hold?.kind === 'pending' && stash.current?.name === 'pending'
+          ? stash.current
+          : undefined;
+    const at = Date.now();
+    stamp.current = at;
+    try {
+      const session: Saved = { messages, tree, tasks, counters, seq: seq.current, at, pending: waiting };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    } catch {
+      // Private windows can refuse storage. The conversation just won't survive a refresh.
+    }
+  }, [active, messages, tree, tasks, counters, scene, hold]);
 
   /** Open a chat from the list, on the line the employee was last on inside it. */
   const openChat = (chat: string) => {
@@ -801,6 +933,11 @@ export default function App({ active = true }: { active?: boolean }) {
     stash.current = null;
     hints.current.clear();
     setPanel(null);
+    try {
+      localStorage.removeItem(SESSION_KEY);
+    } catch {
+      // Nothing was saved, so there is nothing to clear.
+    }
     void service.reset?.();
     setMessages(seedMessages);
     messagesRef.current = seedMessages;
@@ -955,6 +1092,7 @@ export default function App({ active = true }: { active?: boolean }) {
         onShowLayers={toggleHidden}
         reserve={reserve}
         sidebarSlot={labFloating ? null : labPanel}
+        onReset={reset}
         onDraftChange={changeDraft}
         onSend={() => void send()}
         onReview={review}

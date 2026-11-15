@@ -36,14 +36,48 @@ interface Member {
   branches: MapShape | null;
 }
 
+interface Settings {
+  policy_mode: 'approval' | 'warn';
+  unsure_mode: 'ask' | 'allow' | 'defer';
+}
+
 interface ManagerData {
   manager: string;
   project: { name: string; title: string; due: string };
   pending: Pending[];
   team: Member[];
+  settings: Settings;
+  rules: { id: string; name: string; text: string }[];
+  /** The audit log in plain words. What the employee typed is not in it. */
+  audit: { ts: number; who: string; what: string; note: string }[];
+}
+
+const POLICY: [Settings['policy_mode'], string][] = [
+  ['approval', 'Hold it for my approval'],
+  ['warn', 'Warn, and let them decide'],
+];
+
+const UNSURE: [Settings['unsure_mode'], string][] = [
+  ['ask', 'Ask the employee'],
+  ['allow', 'Send it and log it'],
+  ['defer', 'Send it to me'],
+];
+
+function Choice<T extends string>(props: { label: string; value: T; options: [T, string][]; onChange(value: T): void }) {
+  return (
+    <div className="mgr__seg" role="group" aria-label={props.label}>
+      {props.options.map(([value, text]) => (
+        <button key={value} type="button" aria-pressed={value === props.value} onClick={() => props.onChange(value)}>
+          {text}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 const clock = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const stamp = (ts: number) =>
+  new Date(ts * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' });
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /** The branch map in words, for the line under it. */
@@ -67,6 +101,9 @@ export function ManagerView() {
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [chosen, setChosen] = useState('jordan');
+  const [showAudit, setShowAudit] = useState(false);
+  /** A rule the manager just changed, shown at once while the server catches up. */
+  const [draft, setDraft] = useState<Settings | null>(null);
 
   const load = () =>
     fetch('/api/manager')
@@ -94,6 +131,20 @@ export function ManagerView() {
     setBusy(null);
   };
 
+  /** Change a rule for the whole team. It applies from each person's next prompt. */
+  const setRule = async (change: Partial<Settings>) => {
+    if (!data) return;
+    const next = { ...(draft ?? data.settings), ...change };
+    setDraft(next);
+    await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...next, actor: 'manager' }),
+    }).catch(() => {});
+    await load();
+    setDraft(null);
+  };
+
   if (!data) {
     return (
       <main className="mgr">
@@ -106,6 +157,8 @@ export function ManagerView() {
   const first = member.name.split(' ')[0];
   const done = member.tasks.filter((t) => t.status === 'done').length;
   const team = data.team[0]?.team ?? 'Your';
+  const settings = draft ?? data.settings;
+  const rule = (id: string) => data.rules.find((r) => r.id === id);
 
   return (
     <div className="root">
@@ -175,6 +228,44 @@ export function ManagerView() {
               </article>
             ))
           )}
+        </section>
+
+        <section aria-labelledby="rules">
+          <h2 id="rules">
+            Rules <span>for the whole team, from their next prompt</span>
+          </h2>
+          <div className="mgr__rules">
+            <div className="mgr__rule">
+              <p>
+                <code>AI-01</code>
+                <b>{rule('AI-01')?.name ?? 'Assigned work only'}.</b> When a prompt is off-project:
+              </p>
+              <Choice
+                label="When a prompt is off-project"
+                value={settings.policy_mode}
+                options={POLICY}
+                onChange={(policy_mode) => void setRule({ policy_mode })}
+              />
+            </div>
+            <div className="mgr__rule">
+              <p>
+                <b>Unclear prompts.</b> When Layers cannot tell if a prompt is project work:
+              </p>
+              <Choice
+                label="When Layers cannot tell"
+                value={settings.unsure_mode}
+                options={UNSURE}
+                onChange={(unsure_mode) => void setRule({ unsure_mode })}
+              />
+            </div>
+            <div className="mgr__rule">
+              <p>
+                <code>AI-02</code>
+                <b>{rule('AI-02')?.name ?? 'Reuse before rebuild'}.</b> {rule('AI-02')?.text}
+              </p>
+              <span className="mgr__on">Always on</span>
+            </div>
+          </div>
         </section>
 
         <section aria-labelledby="team">
@@ -296,6 +387,31 @@ export function ManagerView() {
               <p className="mgr__empty">No branch map yet. It appears once {first}'s workspace is open.</p>
             )}
           </div>
+        </section>
+
+        <section aria-labelledby="audit">
+          <h2 id="audit">
+            Audit trail <span>every check, tool call and decision</span>
+            <button type="button" className="mgr__more" aria-expanded={showAudit} onClick={() => setShowAudit((s) => !s)}>
+              {showAudit ? 'Hide' : `Show the last ${data.audit.length}`}
+            </button>
+          </h2>
+          {showAudit &&
+            (data.audit.length === 0 ? (
+              <p className="mgr__empty">Nothing has been logged yet in this session.</p>
+            ) : (
+              <ol className="mgr__audit">
+                {data.audit.map((row, i) => (
+                  <li key={`${row.ts}-${i}`}>
+                    <time>{stamp(row.ts)}</time>
+                    <b>{row.who}</b>
+                    <span>{row.what}</span>
+                    <code>{row.note}</code>
+                  </li>
+                ))}
+              </ol>
+            ))}
+          {showAudit && <p className="mgr__empty">Who did what, and how long each tool call took. What was typed is left out.</p>}
         </section>
 
         <p className="mgr__fine">

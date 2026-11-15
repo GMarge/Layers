@@ -59,6 +59,8 @@ interface Props {
   /** Room Layers needs above the chat box. The thread leaves it free. */
   reserve: number;
   sidebarSlot?: ReactNode;
+  /** Wipe the conversation and start the demo again. */
+  onReset(): void;
   onDraftChange(text: string): void;
   onSend(): void;
   onReview(): void;
@@ -397,7 +399,12 @@ export function Workspace(p: Props) {
               <span>{employee.role}</span>
             </span>
           </p>
-          <p className="side__fine">Demo workspace. The company, people and data are fictional.</p>
+          <p className="side__fine">
+            Demo workspace. The company, people and data are fictional. Your chats are kept on this device.{' '}
+            <button type="button" onClick={p.onReset}>
+              Start over
+            </button>
+          </p>
         </div>
       </aside>
 

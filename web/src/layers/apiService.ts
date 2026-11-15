@@ -97,6 +97,13 @@ const service: LayersService = {
     await post('settings', { policy_mode: settings.policyMode, unsure_mode: settings.unsureMode });
   },
 
+  async settings() {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error('settings unavailable');
+    const s = (await res.json()) as { policy_mode: 'warn' | 'approval'; unsure_mode: 'ask' | 'allow' | 'defer' };
+    return { policyMode: s.policy_mode, unsureMode: s.unsure_mode };
+  },
+
   async approvalStatus(requestId) {
     const res = await fetch(`/api/approvals/${requestId}`);
     if (!res.ok) return 'pending';
