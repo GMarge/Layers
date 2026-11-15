@@ -383,9 +383,11 @@
 
 .intro__start {
   display: inline-flex;
+  flex: none;
   align-items: center;
   gap: 10px;
   height: 48px;
+  white-space: nowrap;
   padding: 0 12px 0 20px;
   border-radius: 14px;
   background: var(--agent);
@@ -561,8 +563,12 @@
   }
 
   .intro__start {
-    flex: 1;
+    flex: 1 0 auto;
     justify-content: center;
+  }
+
+  .intro__more {
+    margin-inline: auto;
   }
 
   .intro__start kbd {
