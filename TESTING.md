@@ -39,7 +39,7 @@ The free key allows **15 model requests a minute and 500 a day** for the main mo
 ## At the table
 
 1. Start the two servers (the commands are in the README) and open `http://localhost:5173/#intro`. That is the **How it works** screen: leave it up between demos. It loops through six example prompts by itself.
-2. Click **Start the live demo**, or press Enter. The dark bar pops in at the top: use **Try it** there for one-click examples. The button reads "Try the scripted preview" instead when the server is not answering.
+2. Click **Start the live demo**, or press Enter. The dark bar pops in at the top: use **Try it** there for one-click examples. On a copy with no server, such as the Vercel link, the button reads "Try the live demo" and the workspace it opens says its answers are placeholders.
 3. Click **Refresh** in the top bar before the next person. **Try it**, then **How it works**, goes back to the first screen.
 
 ## By hand

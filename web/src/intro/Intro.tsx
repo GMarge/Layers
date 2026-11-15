@@ -88,8 +88,9 @@ export function Intro() {
   /** How many stages of this example's path have lit up so far. */
   const [step, setStep] = useState(0);
   /**
-   * Whether the Layers server is answering. Without it the workspace runs its scripted preview,
-   * and the button says so. The first guess is by address, so the label does not flicker.
+   * Whether the Layers server is answering. On a hosted copy without it the button invites people
+   * to try the demo; the workspace it opens says that its answers are placeholders. The first
+   * guess is by address, so the label does not flicker.
    */
   const [live, setLive] = useState(() => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname));
   const story = STORIES[at]!;
@@ -232,7 +233,7 @@ export function Intro() {
 
         <footer className="intro__foot">
           <a className="intro__start" href="#">
-            {live ? 'Start the live demo' : 'Try the scripted preview'}
+            {live ? 'Start the live demo' : 'Try the live demo'}
             <kbd>Enter</kbd>
           </a>
           <a className="intro__more" href="#manager">
