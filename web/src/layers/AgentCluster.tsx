@@ -104,6 +104,8 @@ interface Props {
   onAbsorbedChange: (absorbed: boolean) => void;
   /** Reports how much room above the composer Layers needs, so the chat can make way. */
   onReserveChange: (px: number) => void;
+  /** Reports when the agent is being held over the chat box. */
+  onOverBoxChange: (over: boolean) => void;
 }
 
 export function AgentCluster(props: Props) {
@@ -217,12 +219,19 @@ export function AgentCluster(props: Props) {
   onAbsorbed.current = props.onAbsorbedChange;
   useEffect(() => onAbsorbed.current(absorbed), [absorbed]);
 
+  const overBox = (centre: Point) => {
+    const r = composerRect();
+    return !!r && centre.x > r.left - 24 && centre.x < r.right + 24 && centre.y > r.top - 44 && centre.y < r.bottom + 24;
+  };
+  const over = !!drag && overBox(drag);
+  const onOver = useRef(props.onOverBoxChange);
+  onOver.current = props.onOverBoxChange;
+  useEffect(() => onOver.current(over), [over]);
+
   /** Dropping the agent on the chat box tucks it in. Anywhere else becomes its new spot. */
   const onDrop = (centre: Point) => {
     setDrag(null);
-    const r = composerRect();
-    const onComposer =
-      !!r && centre.x > r.left - 24 && centre.x < r.right + 24 && centre.y > r.top - 44 && centre.y < r.bottom + 24;
+    const onComposer = overBox(centre);
     if (onComposer) {
       props.onRestChange('absorbed');
       return;
@@ -246,6 +255,7 @@ export function AgentCluster(props: Props) {
         rising={emerging}
         reducedMotion={reducedMotion}
         grabbed={!!drag}
+        over={over}
         draggable={!speaking && !emerging && presence !== 'gone'}
         label={speaking ? 'Layers' : 'Layers. Ask a question, or drag to move.'}
         onClick={props.onMascotClick}

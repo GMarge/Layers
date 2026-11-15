@@ -84,6 +84,8 @@ export default function App() {
   const [absorbed, setAbsorbed] = useState(false);
   /** Room the chat leaves above the chat box so Layers never covers a message. */
   const [reserve, setReserve] = useState(0);
+  /** The agent is being held over the chat box. */
+  const [dropReady, setDropReady] = useState(false);
   // On a phone-width screen the lab floats over the page, so it starts closed there.
   const [lab, setLab] = useState<LabSettings>(() => ({
     ...defaultLab,
@@ -792,6 +794,7 @@ export default function App() {
         setAside={setAside}
         layout={lab.layout}
         layersIn={absorbed}
+        dropReady={dropReady}
         layersHidden={lab.rest === 'hidden'}
         onShowLayers={toggleHidden}
         reserve={reserve}
@@ -817,6 +820,7 @@ export default function App() {
         onMascotClick={openAsk}
         onRestChange={(rest) => setLab((s) => (s.rest === rest ? s : { ...s, rest }))}
         onAbsorbedChange={setAbsorbed}
+        onOverBoxChange={setDropReady}
         onReserveChange={setReserve}
       />
       <Toast toast={toast} onClose={() => setToast(null)} />

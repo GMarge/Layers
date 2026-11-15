@@ -816,3 +816,35 @@ li[data-status='done'] {
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent) 45%, transparent);
   }
 }
+
+/* The agent is being held over the chat box: the box lights up and opens a little to take it in. */
+.composer[data-drop]::after {
+  opacity: 1;
+  inset: -3px;
+  padding: 3px;
+  border-radius: 18px;
+}
+
+.composer[data-drop] {
+  box-shadow:
+    0 0 0 6px color-mix(in srgb, var(--agent) 14%, transparent),
+    0 12px 32px -10px color-mix(in srgb, var(--agent) 55%, transparent);
+  transform: scale(1.012);
+  transition:
+    transform 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out);
+}
+
+.composer {
+  transition:
+    border-color var(--t-fast),
+    box-shadow var(--t-med),
+    transform 220ms var(--ease-out);
+}
+
+.composer::after {
+  transition:
+    opacity 300ms var(--ease-out),
+    inset 220ms var(--ease-out),
+    padding 220ms var(--ease-out);
+}

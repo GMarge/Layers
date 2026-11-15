@@ -18,6 +18,8 @@ interface Props {
   layout: 'sidebar' | 'focus';
   /** The Layers agent is melted into the chat box, so the box wears its outline. */
   layersIn: boolean;
+  /** The agent is being held over the chat box: show it is welcome here. */
+  dropReady: boolean;
   /** The employee has hidden the agent. It still checks prompts, so the page says so. */
   layersHidden: boolean;
   onShowLayers(): void;
@@ -322,6 +324,7 @@ export function Workspace(p: Props) {
             className="composer"
             data-hold={p.hold?.kind}
             data-layers={p.layersIn ? 'in' : undefined}
+            data-drop={p.dropReady ? '' : undefined}
             onSubmit={(e) => {
               e.preventDefault();
               p.onSend();
@@ -342,7 +345,7 @@ export function Workspace(p: Props) {
                 rows={1}
                 value={p.draft}
                 readOnly={pending}
-                placeholder={`Ask about ${project.name}`}
+                placeholder={p.dropReady ? 'Let go to tuck Layers in here' : `Ask about ${project.name}`}
                 aria-label={`Message ${company.assistant}`}
                 onChange={(e) => p.onDraftChange(e.target.value)}
                 onKeyDown={onKeyDown}

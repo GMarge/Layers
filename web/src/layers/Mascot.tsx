@@ -71,6 +71,8 @@ interface Props {
   rising: boolean;
   reducedMotion: boolean;
   grabbed: boolean;
+  /** Being held over the chat box, where letting go tucks it in. */
+  over: boolean;
   draggable: boolean;
   label: string;
   onClick: () => void;
@@ -194,6 +196,7 @@ export function Mascot(props: Props) {
       data-mood={mood}
       data-phase={shown}
       data-grab={grabbed ? '' : undefined}
+      data-over={props.over ? '' : undefined}
       style={{ '--eye-lift': `${s.eyeY - NIB_EYE_Y}px` } as CSSProperties}
       aria-label={label}
       aria-hidden={shown === 'gone' ? true : undefined}

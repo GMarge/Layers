@@ -267,12 +267,12 @@
   width: 100%;
   height: 100%;
   overflow: visible;
-  transform: rotate(-3deg);
+  transform: none;
   transition: transform var(--t-med) var(--ease-out);
 }
 
 .mascot[data-grab] .mascot__svg {
-  transform: rotate(-3deg) scale(1.06);
+  transform: scale(1.06);
 }
 
 .mascot__body {
@@ -1274,7 +1274,7 @@ li[data-status='done'] .steps__mark {
   height: 64px;
   overflow: visible;
   fill: var(--agent);
-  transform: rotate(-3deg);
+  transform: none;
   transform-origin: 50% 100%;
   opacity: 0;
   /* No fade: it must vanish the instant its animation ends, or it flashes at full size. */
@@ -1378,19 +1378,19 @@ li[data-status='done'] .steps__mark {
 
 @keyframes flow-up {
   from {
-    transform: rotate(-3deg) translateY(20px) scale(0.55, 0.25);
+    transform: translateY(20px) scale(0.55, 0.25);
   }
   to {
-    transform: rotate(-3deg) translateY(0) scale(1);
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes flow-down {
   from {
-    transform: rotate(-3deg) translateY(0) scale(1);
+    transform: translateY(0) scale(1);
   }
   to {
-    transform: rotate(-3deg) translateY(20px) scale(0.55, 0.25);
+    transform: translateY(20px) scale(0.55, 0.25);
   }
 }
 
@@ -1489,4 +1489,16 @@ li[data-status='done'] .steps__mark {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   transition-delay: 0s !important;
+}
+
+/* ---------- Dragging over the chat box ---------- */
+
+/* Held over the chat box, he leans in and looks down, ready to pour himself in. */
+.mascot[data-over] .mascot__svg {
+  transform: scale(0.92, 0.84) translateY(6px);
+}
+
+.mascot[data-over] {
+  --gaze-y: 2.6;
+  --fan: 0;
 }
