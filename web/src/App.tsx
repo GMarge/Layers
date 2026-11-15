@@ -1,7 +1,35 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
-import { addPrompt, branchFrom, detach, isVisible, mergeBack, seedTree, topicLabel, type Tree } from './branches/model';
-import { Rail } from './branches/Rail';
-import { DesignLab, defaultLab, type GlowLevel, type LabScene, type LabSettings } from './lab/DesignLab';
+import { BranchPanel, type PanelTab } from './branches/BranchPanel';
+import {
+  PROMOTE_AFTER,
+  addPrompt,
+  branchFrom,
+  chatOf,
+  chatTitle,
+  chatsOf,
+  fold,
+  isVisible,
+  lastLineIn,
+  lineLabel,
+  mergeAll,
+  mergeBack,
+  openLines,
+  outlineOf,
+  promote,
+  seedTree,
+  settle,
+  type TopicHint,
+  type Tree,
+} from './branches/model';
+import {
+  DesignLab,
+  defaultLab,
+  loadName,
+  saveName,
+  type GlowLevel,
+  type LabScene,
+  type LabSettings,
+} from './lab/DesignLab';
 import { AgentCluster } from './layers/AgentCluster';
 import type { BubbleActions, Prefs } from './layers/Bubble';
 import { EdgeGlow, type GlowMode } from './layers/EdgeGlow';
@@ -10,8 +38,11 @@ import { createMockService, previewSteps } from './layers/mockService';
 import { Toast, type ToastState } from './layers/Toast';
 import type { Counters, Hold, KnowledgeItem, Message, RestMode, Scene, Step, Task, Verdict } from './layers/types';
 import { useMediaQuery } from './ui/useMediaQuery';
-import { competitorMatrix, examplePrompts, manager, project, seedMessages, seedTasks } from './workspace/data';
-import { Workspace } from './workspace/Workspace';
+import { competitorMatrix, conversations, examplePrompts, manager, project, seedMessages, seedTasks } from './workspace/data';
+import { Workspace, type ForkMark } from './workspace/Workspace';
+
+/** What the first chat is called. Branches that become chats are named after their direction. */
+const ROOT_TITLE = conversations[0]!;
 
 const NO_COUNTS: Counters = { checked: 0, held: 0, reused: 0 };
 const GLOW: Record<GlowLevel, number> = { soft: 0.6, standard: 1, bold: 1.5 };
@@ -47,22 +78,26 @@ function glowFor(scene: Scene): GlowMode {
 }
 
 /** One-line summary of the current scene for screen readers. */
-function announce(scene: Scene): string {
+function announce(scene: Scene, name: string): string {
   switch (scene.name) {
     case 'policy':
-      return `Layers held your prompt. It looks unrelated to ${project.name}. Nothing was sent.`;
+      return `${name} held your prompt. It looks unrelated to ${project.name}. Nothing was sent.`;
     case 'branch':
-      return `Layers noticed a new direction: ${scene.label}.`;
+      return scene.what === 'noticed'
+        ? `${name} noticed a new direction: ${scene.label}.`
+        : scene.what === 'moved'
+          ? `${name} moved ${scene.label} into a chat of its own.`
+          : `${name} asks whether ${scene.label} should be a chat of its own.`;
     case 'unsure':
-      return `Layers is not sure this fits ${project.name}. Nothing was sent.`;
+      return `${name} is not sure this fits ${project.name}. Nothing was sent.`;
     case 'pending':
       return `Approval request ${scene.requestId} sent to ${scene.approver}.`;
     case 'decided':
       return scene.approved ? `${scene.approver} approved your request.` : `${scene.approver} declined your request.`;
     case 'reuse':
-      return `Layers found an approved team workflow: ${scene.item.name}.`;
+      return `${name} found an approved team workflow: ${scene.item.name}.`;
     case 'working':
-      return `Layers is applying ${scene.item.name}.`;
+      return `${name} is applying ${scene.item.name}.`;
     case 'done':
       return scene.summary;
     default:
@@ -70,7 +105,11 @@ function announce(scene: Scene): string {
   }
 }
 
-export default function App() {
+/**
+ * `active` is false while this workspace is mounted but not the one on screen, as on the
+ * manager's page. A workspace nobody is using must not tell the server anything.
+ */
+export default function App({ active = true }: { active?: boolean }) {
   const [messages, setMessages] = useState<Message[]>(seedMessages);
   const [tasks, setTasks] = useState<Task[]>(seedTasks);
   const [draft, setDraft] = useState('');
@@ -90,7 +129,12 @@ export default function App() {
   const [lab, setLab] = useState<LabSettings>(() => ({
     ...defaultLab,
     open: !window.matchMedia('(max-width: 760px)').matches,
+    name: loadName(),
   }));
+  const name = lab.name;
+  useEffect(() => saveName(name), [name]);
+  /** The branch map and today-so-far page, when it is open. */
+  const [panel, setPanel] = useState<PanelTab | null>(null);
 
   /** Bumped whenever the current flow is superseded, so late async work can tell it is stale. */
   const run = useRef(0);
@@ -128,8 +172,8 @@ export default function App() {
 
   // The company's choices live on the server, which is what actually enforces them.
   useEffect(() => {
-    void service.sync?.({ policyMode: lab.policyMode, unsureMode: lab.unsureMode });
-  }, [service, lab.policyMode, lab.unsureMode]);
+    if (active) void service.sync?.({ policyMode: lab.policyMode, unsureMode: lab.unsureMode });
+  }, [active, service, lab.policyMode, lab.unsureMode]);
 
   /** The latest thing told to the server. Sending waits for it, so the gate sees it first. */
   const settled = useRef<Promise<unknown>>(Promise.resolve());
@@ -156,28 +200,68 @@ export default function App() {
     setTree(next);
   };
 
+  // The manager sees the shape of the branches: how many, of what kind, on which part of
+  // the project. The prompts themselves are not in what is sent.
+  useEffect(() => {
+    if (active) void service.branches?.(outlineOf(tree)).catch(() => {});
+  }, [active, service, tree]);
+
+  /** The direction the conversation is on, and the others this chat has taken, by name. */
+  const where = () => {
+    const t = treeRef.current;
+    const chat = chatOf(t, t.active);
+    const current = t.lines.find((l) => l.id === t.active)!;
+    const near = (l: (typeof t.lines)[number]) =>
+      chatOf(t, l.id) === chat || (!!l.promoted && !!l.parent && chatOf(t, l.parent) === chat);
+    const others = t.lines.filter((l) => l.id !== current.id && !l.merged && (l.topic || l.label) && near(l));
+    return {
+      current: current.topic || current.label ? lineLabel(current) : null,
+      others: [...new Set(others.map(lineLabel))].slice(0, 12),
+    };
+  };
+
+  /** What the agent said each prompt is about, kept until the prompt is actually sent. */
+  const hints = useRef(new Map<string, TopicHint | null>());
+  const titleOf = (lineId: string) => chatTitle(treeRef.current, chatOf(treeRef.current, lineId), ROOT_TITLE);
+
   const post = (m: Omit<Message, 'id'>, line?: string) => {
     const full: Message = { ...m, id: crypto.randomUUID(), line: line ?? treeRef.current.active, seq: seq.current++ };
     messagesRef.current = [...messagesRef.current, full];
     setMessages((ms) => [...ms, full]);
   };
 
+  const notify = (text: string) => setToast({ id: Date.now(), text });
+
   /** Put a sent prompt on the map. Returns the line it landed on. */
   const track = (prompt: string): string => {
-    const { tree: next, branched } = addPrompt(treeRef.current, prompt, seq.current);
+    // The agent's reading of the prompt if it gave one. Otherwise the keyword list decides.
+    const hint = hints.current.has(prompt) ? hints.current.get(prompt) : undefined;
+    hints.current.delete(prompt);
+    const added = addPrompt(treeRef.current, prompt, seq.current, hint);
+    let next = added.tree;
+    const back = added.returned;
+    // Coming back to the same noticed direction again: it has earned a chat of its own.
+    const ripe = !!back && !back.settled && back.visits >= PROMOTE_AFTER;
+    const quiet = branchModeRef.current === 'auto';
+    const from = back?.parent ? titleOf(back.parent) : ROOT_TITLE;
+    if (back && ripe && quiet) next = promote(next, back.id, true);
     changeTree(next);
-    if (branched) {
-      const label = topicLabel(branched.topic);
+
+    const say = (scene: Scene) =>
+      setTimeout(() => {
+        if (sceneRef.current.name === 'ambient') setScene(scene);
+      }, 700);
+    if (back && ripe) {
+      say({ name: 'branch', lineId: back.id, label: lineLabel(back), what: quiet ? 'moved' : 'offer', from });
+    } else if (added.routed) {
+      notify(`That belongs with ${lineLabel(added.routed)}, so it went to that chat.`);
+    } else if (added.branched && !quiet) {
       // Quiet mode: the map shows the new branch and nothing interrupts the employee.
-      if (branchModeRef.current !== 'auto') {
-        setTimeout(() => {
-          if (sceneRef.current.name === 'ambient') setScene({ name: 'branch', lineId: branched.id, label });
-        }, 700);
-      }
+      const line = added.branched;
+      say({ name: 'branch', lineId: line.id, label: lineLabel(line), what: 'noticed', from });
     }
     return next.active;
   };
-  const notify = (text: string) => setToast({ id: Date.now(), text });
   const focusPrompt = () => requestAnimationFrame(() => document.getElementById('prompt')?.focus());
 
   /** The prompt is cleared to go to the workspace model. */
@@ -261,7 +345,7 @@ export default function App() {
     }
 
     // Unsure, and the employee gets to decide.
-    setHold({ kind: 'policy', label: 'Not sent yet. Layers has a question.' });
+    setHold({ kind: 'policy', label: `Not sent yet. ${name} has a question.` });
     setScene({ name: 'unsure', prompt, rule: verdict.rule, reason: verdict.reason, signals: verdict.signals });
   };
 
@@ -275,16 +359,21 @@ export default function App() {
     setScene({ name: 'checking', engaged: false });
     let verdict: Verdict;
     try {
-      verdict = await service.preflight(prompt, (p) => {
-        if (token === run.current) setScene({ name: 'checking', engaged: p.engaged, note: p.note });
-      });
+      verdict = await service.preflight(
+        prompt,
+        (p) => {
+          if (token === run.current) setScene({ name: 'checking', engaged: p.engaged, note: p.note });
+        },
+        where(),
+      );
     } catch {
       if (token !== run.current) return;
       setScene({ name: 'ambient' });
-      notify('Layers could not check that, so nothing was sent.');
+      notify(`${name} could not check that, so nothing was sent.`);
       return;
     }
     if (token !== run.current) return;
+    if (verdict.topic !== undefined) hints.current.set(prompt, verdict.topic);
 
     setCounters((c) => ({ ...c, checked: c.checked + 1 }));
     if (verdict.kind === 'pass') {
@@ -314,8 +403,9 @@ export default function App() {
     if (!prompt) return;
     const token = ++run.current;
     setScene({ name: 'ask', question: 'Can I send my draft?', busy: true, answer: null });
-    const verdict = await service.preflight(prompt, () => {});
+    const verdict = await service.preflight(prompt, () => {}, where());
     if (token !== run.current) return;
+    if (verdict.topic !== undefined) hints.current.set(prompt, verdict.topic);
     setCounters((c) => ({ ...c, checked: c.checked + 1 }));
     if (verdict.kind !== 'pass') {
       holdPrompt(prompt, verdict);
@@ -509,7 +599,7 @@ export default function App() {
       .catch(() => {
         if (token !== run.current) return;
         setScene({ name: 'ambient' });
-        notify('Layers could not finish that. Nothing was changed.');
+        notify(`${name} could not finish that. Nothing was changed.`);
       });
     speed.current = 1;
   };
@@ -616,6 +706,54 @@ export default function App() {
     outline: lab.outline,
     policyMode: lab.policyMode,
     unsureMode: lab.unsureMode,
+    name,
+  };
+
+  /** Open a chat from the list, on the line the employee was last on inside it. */
+  const openChat = (chat: string) => {
+    changeTree({ ...treeRef.current, active: lastLineIn(treeRef.current, chat) });
+    focusPrompt();
+  };
+
+  /** Jump to one prompt: open its chat and bring the prompt into view. */
+  const openNode = (nodeId: string) => {
+    const node = treeRef.current.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    setPanel(null);
+    changeTree({ ...treeRef.current, active: node.line });
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`.msg--user[data-seq="${node.seq}"]`);
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el?.setAttribute('data-flash', '');
+      setTimeout(() => el?.removeAttribute('data-flash'), 1500);
+    });
+  };
+
+  /** The employee wants a direction as a chat of its own. */
+  const detachBranch = (lineId: string) => {
+    const line = treeRef.current.lines.find((l) => l.id === lineId);
+    if (!line) return;
+    changeTree(promote(treeRef.current, lineId, false));
+    setScene({ name: 'ambient' });
+    notify(`${lineLabel(line)} is now a chat of its own.`);
+  };
+
+  /** Put a chat that started as a noticed direction back where it came from. */
+  const foldBranch = (lineId: string) => {
+    const line = treeRef.current.lines.find((l) => l.id === lineId);
+    if (!line?.parent) return;
+    const back = titleOf(line.parent);
+    changeTree(fold(treeRef.current, lineId));
+    setScene({ name: 'ambient' });
+    notify(`Put back into ${back}. I won't move it again.`);
+  };
+
+  const mergeAllBranches = () => {
+    const tree = treeRef.current;
+    const count = openLines(tree, chatOf(tree, tree.active)).length;
+    if (count === 0) return;
+    changeTree(mergeAll(tree));
+    notify(count === 1 ? 'Merged 1 branch back.' : `Merged ${count} branches back.`);
   };
 
   const actions: BubbleActions = {
@@ -643,10 +781,15 @@ export default function App() {
       setScene({ name: 'ambient' });
       notify('Merged back into the line it came from.');
     },
-    detachBranch: (lineId) => {
-      changeTree(detach(treeRef.current, lineId));
+    detachBranch,
+    foldBranch,
+    leaveBranch: (lineId) => {
+      changeTree(settle(treeRef.current, lineId));
       setScene({ name: 'ambient' });
-      notify('It is now a chat of its own.');
+    },
+    openBranches: () => {
+      setScene({ name: 'ambient' });
+      setPanel('branches');
     },
     setPrefs: (change) => setLab((s) => ({ ...s, ...change })),
   };
@@ -656,6 +799,8 @@ export default function App() {
     abort.current?.abort();
     speed.current = 1;
     stash.current = null;
+    hints.current.clear();
+    setPanel(null);
     void service.reset?.();
     setMessages(seedMessages);
     messagesRef.current = seedMessages;
@@ -743,6 +888,20 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // The chats this conversation has split into, and where the open one sits among them.
+  const chats = chatsOf(tree);
+  const here = chatOf(tree, tree.active);
+  const thisChat = chats.find((c) => c.id === here);
+  const marks: ForkMark[] = chats
+    .filter((c) => c.parent === here)
+    .map((c) => ({
+      id: c.id,
+      seq: c.startsAt,
+      title: chatTitle(tree, c.id, ROOT_TITLE),
+      prompts: c.prompts,
+      byLayers: c.byLayers,
+    }));
+
   const labFloating = sidebarHidden || lab.layout === 'focus';
   const labPanel = (
     <DesignLab
@@ -765,28 +924,25 @@ export default function App() {
     >
       <Workspace
         messages={messages.filter((m) => isVisible(tree, m))}
-        railSlot={
-          <Rail
-            tree={tree}
-            onOpen={(nodeId) => {
-              const node = tree.nodes.find((n) => n.id === nodeId);
-              if (!node) return;
-              changeTree({ ...tree, active: node.line });
-              requestAnimationFrame(() => {
-                const el = document.querySelector<HTMLElement>(`.msg--user[data-seq="${node.seq}"]`);
-                el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-                el?.setAttribute('data-flash', '');
-                setTimeout(() => el?.removeAttribute('data-flash'), 1500);
-              });
-            }}
-            onBranch={(nodeId) => {
-              changeTree(branchFrom(tree, nodeId));
-              notify('New branch. Your next prompt starts from that point.');
-              focusPrompt();
-            }}
-            onMerge={(lineId) => changeTree(mergeBack(tree, lineId))}
-          />
+        agentName={name}
+        chats={chats.map((c) => ({
+          id: c.id,
+          title: chatTitle(tree, c.id, ROOT_TITLE),
+          depth: c.depth,
+          current: c.id === here,
+          byLayers: c.byLayers,
+        }))}
+        onOpenChat={openChat}
+        title={chatTitle(tree, here, ROOT_TITLE)}
+        crumb={thisChat?.parent ? chatTitle(tree, thisChat.parent, ROOT_TITLE) : null}
+        marks={marks}
+        origin={
+          thisChat?.parent
+            ? { seq: thisChat.startsAt, title: chatTitle(tree, thisChat.parent, ROOT_TITLE), byLayers: thisChat.byLayers }
+            : null
         }
+        branchCount={tree.lines.length - 1}
+        onOpenBranches={() => setPanel('branches')}
         tasks={tasks}
         draft={draft}
         hold={hold}
@@ -818,15 +974,47 @@ export default function App() {
         prefs={prefs}
         actions={actions}
         onMascotClick={openAsk}
+        onOpenPanel={setPanel}
         onRestChange={(rest) => setLab((s) => (s.rest === rest ? s : { ...s, rest }))}
         onAbsorbedChange={setAbsorbed}
         onOverBoxChange={setDropReady}
         onReserveChange={setReserve}
       />
+      {panel && (
+        <BranchPanel
+          tab={panel}
+          tree={tree}
+          rootTitle={ROOT_TITLE}
+          projectName={project.name}
+          agentName={name}
+          tasks={tasks}
+          counters={counters}
+          onTab={setPanel}
+          onClose={() => setPanel(null)}
+          onOpenNode={openNode}
+          onOpenChat={(chat) => {
+            setPanel(null);
+            openChat(chat);
+          }}
+          onBranch={(nodeId) => {
+            setPanel(null);
+            changeTree(branchFrom(treeRef.current, nodeId));
+            notify('New chat. It starts from that prompt, and your next one goes here.');
+            focusPrompt();
+          }}
+          onMerge={(lineId) => changeTree(mergeBack(treeRef.current, lineId))}
+          onMergeAll={mergeAllBranches}
+          onDetach={(lineId) => {
+            setPanel(null);
+            detachBranch(lineId);
+          }}
+          onFold={foldBranch}
+        />
+      )}
       <Toast toast={toast} onClose={() => setToast(null)} />
       {labFloating && labPanel}
       <div className="sr-only" role="status" aria-live="polite">
-        {announce(scene)}
+        {announce(scene, name)}
       </div>
     </div>
   );

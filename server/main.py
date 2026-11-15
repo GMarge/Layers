@@ -2,6 +2,7 @@
 
 import json
 import queue
+import re
 import threading
 from typing import Callable, Literal
 
@@ -43,6 +44,35 @@ WORKSPACE_PROMPT = (
 )
 
 
+# The four parts of the project a conversation can be on. The branch map names these and
+# nothing else, so a line about anything off the brief reaches the manager as "Other direction".
+TOPIC_LABELS = {"research": "Competitor research", "analysis": "Analysis",
+                "sheet": "Comparison spreadsheet", "deck": "Presentation"}
+
+
+TOPIC_IDS = {label.lower(): key for key, label in TOPIC_LABELS.items()}
+
+
+def clean_label(text: str) -> str:
+    """A direction's name as plain words. It goes into the agent's task, so nothing else gets in."""
+    return " ".join(re.sub(r"[^A-Za-z0-9 ]", " ", text).split())[:40]
+
+
+def topic_of(said: dict | None, current: str = "") -> tuple[bool, dict | None]:
+    """What the agent said a prompt is about, as the branch map wants it. Returns (judged, hint).
+    A hint of None means the prompt carries on with what the conversation was doing."""
+    raw = clean_label(str((said or {}).get("topic", ""))).lower()
+    if not raw:
+        return False, None
+    if raw in ("same", "none", "continue", "follow up", "current") or raw == current.lower():
+        return True, None
+    key = raw if raw in TOPIC_LABELS else TOPIC_IDS.get(raw)
+    if key:
+        return True, {"id": key, "label": TOPIC_LABELS[key]}
+    words = raw.split()[:3]
+    return True, {"id": "x-" + "-".join(words), "label": " ".join(words).capitalize()}
+
+
 def act_task(workflow_id: str) -> str:
     return (f"ACT: apply workflow {workflow_id} to {db.PROJECT['name']} for the employee.")
 
@@ -51,6 +81,12 @@ Prompt = Field(min_length=1, max_length=4000)
 
 class PromptIn(BaseModel):
     prompt: str = Prompt
+
+
+class PreflightIn(PromptIn):
+    # Where the conversation is, by name, so the agent can say whether this prompt leaves it.
+    current: str | None = Field(default=None, max_length=60)
+    others: list[str] = Field(default_factory=list, max_length=12)
 
 
 class Turn(BaseModel):
@@ -92,6 +128,32 @@ class SettingsIn(BaseModel):
 class UndoIn(BaseModel):
     artifact_id: str = Field(max_length=80)
     task_id: str = Field(max_length=20)
+
+
+LINE_ID = r"^[a-z0-9]{1,12}$"
+
+
+class LineIn(BaseModel):
+    id: str = Field(pattern=LINE_ID)
+    kind: Literal["main", "implicit", "explicit"]
+    parent: str | None = Field(default=None, pattern=LINE_ID)
+    fork: int | None = Field(default=None, ge=-1, le=2000)
+    topic: str | None = Field(default=None, max_length=24)
+    merged: bool = False
+    promoted: bool = False
+
+
+class NodeIn(BaseModel):
+    line: str = Field(pattern=LINE_ID)
+    reopened: bool = False
+    visit: int = Field(default=1, ge=1, le=99)
+
+
+class BranchesIn(BaseModel):
+    """The shape of a conversation. There is no field here that could carry what was typed."""
+    lines: list[LineIn] = Field(max_length=80)
+    nodes: list[NodeIn] = Field(max_length=600)
+    active: str = Field(pattern=LINE_ID)
 
 
 def stream(work: Callable[[Callable[[dict], None]], dict]) -> StreamingResponse:
@@ -147,9 +209,21 @@ def settings(body: SettingsIn):
 
 
 @app.post("/api/preflight")
-def preflight(body: PromptIn):
+def preflight(body: PreflightIn):
     """Runs when the employee presses Send. Decides whether the prompt may go to the workspace model."""
     prompt = body.prompt.strip()
+    current = clean_label(body.current or "")
+    known = [current] if current else []
+    for name in [*(clean_label(o) for o in body.others), *TOPIC_LABELS.values()]:
+        if name and name.lower() not in (k.lower() for k in known):
+            known.append(name)
+    directions = (
+        f"The conversation is on this direction right now: {current or 'none yet'}.\n"
+        f"Directions it could belong to: {', '.join(known)}.\n"
+        "For topic, give one of those names exactly when the prompt belongs there. A prompt that only "
+        "refines, shortens or continues the last answer belongs to the current direction. Give two or "
+        "three plain words for a new direction only when it is about something none of them cover."
+    )
 
     def work(emit):
         screen = policy.screen(prompt)
@@ -170,15 +244,26 @@ def preflight(body: PromptIn):
             if kind == "review":  # if the agent cannot be reached, do not guess: ask
                 kind = "unsure"
             decided_by = "gate"
+            judged, hint = False, None
+
+            def verdict(found: dict) -> dict:
+                # When the agent read the prompt it also said what it is about. That costs no
+                # extra model run, and it is what lets the branches follow meaning, not keywords.
+                if judged:
+                    found["topic"] = hint
+                return {"type": "verdict", "verdict": found}
+
             supervisor = agent.get()
             if supervisor:
                 try:
                     recent = "\n".join(f"{m['role']}: {m['content'][:300]}" for m in CHAT[-4:])
                     agent.run(supervisor,
                               f"REVIEW this prompt the employee tried to send:\n<prompt>\n{prompt}\n</prompt>\n"
-                              f"The conversation so far, for context only:\n<conversation>\n{recent}\n</conversation>")
+                              f"The conversation so far, for context only:\n<conversation>\n{recent}\n</conversation>\n"
+                              f"{directions}")
                     scratch = tools._scratch
                     said = scratch.get("verdict")
+                    judged, hint = topic_of(said, current)
                     # The model may explain and refine, but it cannot clear what the rules flagged.
                     if said and not (screen["kind"] == "policy" and said["kind"] in ("pass", "reuse")):
                         kind, reason, decided_by = said["kind"], said["reason"] or reason, "agent"
@@ -215,16 +300,15 @@ def preflight(body: PromptIn):
                                 db.audit("harness", "paused_for_approval", {"workflow": item["id"]})
                         except Exception as exc:
                             db.audit("server", "agent_failed", str(exc))
-                    return {"type": "verdict", "verdict": {
-                        "kind": "reuse", "item": item,
-                        "reason": f"{item['author']} already built a workflow for this."}}
+                    return verdict({"kind": "reuse", "item": item,
+                                    "reason": f"{item['author']} already built a workflow for this."})
             if kind == "pass":
                 policy.record(prompt, "pass", True, reason or "On project.", decided_by)
-                return {"type": "verdict", "verdict": {"kind": "pass"}}
+                return verdict({"kind": "pass"})
 
             policy.record(prompt, kind, False, reason, decided_by)
-            return {"type": "verdict", "verdict": {
-                "kind": kind, "rule": rule("AI-01"), "reason": reason, "signals": screen["signals"]}}
+            return verdict({"kind": kind, "rule": rule("AI-01"), "reason": reason,
+                            "signals": screen["signals"]})
         finally:
             tools.end_run()
 
@@ -430,6 +514,86 @@ def approval_status(request_id: str):
     return {"status": rows[0]["status"]}
 
 
+@app.post("/api/branches")
+def branches(body: BranchesIn):
+    """The shape of the employee's conversation, kept for the manager. Each line is named
+    from the fixed list above, never from anything the employee wrote."""
+    shape = {
+        "lines": [{"id": line.id, "kind": line.kind, "parent": line.parent, "fork": line.fork,
+                   "label": TOPIC_LABELS.get(line.topic or "", "Other direction" if line.topic else "New branch"),
+                   "merged": line.merged, "promoted": line.promoted} for line in body.lines],
+        "nodes": [node.model_dump() for node in body.nodes],
+        "active": body.active,
+    }
+    db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", ("branches", json.dumps(shape)))
+    return {"ok": True}
+
+
+def _shape(lines: list[tuple], nodes: list[tuple], active: str) -> dict:
+    seen: dict[str, int] = {}
+    dots = []
+    for line, visit in nodes:  # a prompt re-opens a line when it starts a new visit to it
+        dots.append({"line": line, "reopened": visit > seen.get(line, visit), "visit": visit})
+        seen[line] = visit
+    return {
+        "lines": [{"id": i, "kind": kind, "parent": parent, "fork": fork, "label": label,
+                   "merged": merged, "promoted": promoted}
+                  for i, kind, parent, fork, label, merged, promoted in lines],
+        "nodes": dots,
+        "active": active,
+    }
+
+
+# Two sample teammates, so the manager's page shows what a team looks like. They are not
+# connected to anything: the page marks them "Sample", and only the signed-in employee is live.
+SAMPLE_TEAM = [
+    {
+        "id": "marcus", "name": "Marcus Bell", "role": "Analyst", "team": "Strategy", "sample": True,
+        "project": {"name": "Project Y", "title": "Customer interview synthesis", "due": "Wed, Nov 25"},
+        "tasks": [
+            {"id": "y1", "title": "Collect interview notes", "status": "done"},
+            {"id": "y2", "title": "Tag themes", "status": "done"},
+            {"id": "y3", "title": "Draft the synthesis", "status": "doing"},
+            {"id": "y4", "title": "Review with Priya", "status": "todo"},
+        ],
+        "counts": {"checked": 14, "passed": 12, "held": 1, "reused": 1},
+        "pending": 0,
+        "feed": [
+            {"text": "Layers moved a direction Marcus kept returning to into its own chat."},
+            {"text": "Marcus reused a team workflow. A synthesis sheet was added to Project Y."},
+            {"text": "Layers held a prompt under rule AI-01."},
+        ],
+        "branches": _shape(
+            [("main", "main", None, None, "Interview notes", False, False),
+             ("l1", "implicit", "main", 1, "Theme tagging", True, False),
+             ("l2", "explicit", "main", 4, "Synthesis draft", False, True)],
+            [("main", 1), ("main", 1), ("l1", 1), ("l1", 1), ("main", 2), ("l2", 1), ("main", 3),
+             ("l2", 2), ("l2", 2), ("l2", 2)],
+            "l2"),
+    },
+    {
+        "id": "ines", "name": "Ines Okafor", "role": "Associate", "team": "Strategy", "sample": True,
+        "project": {"name": "Project Z", "title": "Pricing page teardown", "due": "Mon, Nov 23"},
+        "tasks": [
+            {"id": "z1", "title": "Capture competitor pricing pages", "status": "done"},
+            {"id": "z2", "title": "Compare plan tiers", "status": "doing"},
+            {"id": "z3", "title": "Write recommendations", "status": "todo"},
+        ],
+        "counts": {"checked": 10, "passed": 10, "held": 0, "reused": 0},
+        "pending": 0,
+        "feed": [
+            {"text": "Layers noticed a new direction and gave it its own line."},
+            {"text": "Ten prompts went straight through."},
+        ],
+        "branches": _shape(
+            [("main", "main", None, None, "Pricing pages", False, False),
+             ("l1", "implicit", "main", 6, "Plan tiers", False, False)],
+            [("main", 1)] * 7 + [("l1", 1), ("l1", 1), ("main", 2)],
+            "main"),
+    },
+]
+
+
 @app.get("/api/manager")
 def manager():
     """What the manager sees. Prompts appear only when the employee sent them for approval.
@@ -471,16 +635,23 @@ def manager():
     def count(where: str) -> int:
         return db.query(f"SELECT COUNT(*) AS n FROM decisions WHERE {where}")[0]["n"]
 
+    tasks = db.query("SELECT id, title, status FROM tasks")
+    counts = {
+        "checked": count("decided_by IN ('gate', 'agent')"),
+        "passed": count("decided_by IN ('gate', 'agent') AND allowed = 1"),
+        "held": count("verdict IN ('policy', 'unsure')"),
+        "reused": db.query("SELECT COUNT(*) AS n FROM artifacts")[0]["n"],
+    }
+    live = {
+        "id": "jordan", "name": db.EMPLOYEE["name"], "role": db.EMPLOYEE["role"],
+        "team": db.EMPLOYEE["team"], "sample": False, "project": db.PROJECT, "tasks": tasks,
+        "counts": counts, "pending": len(pending), "feed": feed[:12],
+        "branches": json.loads(db.setting("branches") or "null"),
+    }
     return {
         "manager": db.MANAGER, "employee": db.EMPLOYEE, "project": db.PROJECT,
-        "pending": pending, "feed": feed[:12],
-        "tasks": db.query("SELECT id, title, status FROM tasks"),
-        "counts": {
-            "checked": count("decided_by IN ('gate', 'agent')"),
-            "passed": count("decided_by IN ('gate', 'agent') AND allowed = 1"),
-            "held": count("verdict IN ('policy', 'unsure')"),
-            "reused": db.query("SELECT COUNT(*) AS n FROM artifacts")[0]["n"],
-        },
+        "pending": pending, "feed": feed[:12], "tasks": tasks, "counts": counts,
+        "team": [live, *SAMPLE_TEAM],
     }
 
 

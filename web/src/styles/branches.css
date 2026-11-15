@@ -1,0 +1,814 @@
+/* The conversation map: one row per line of thought, one dot per prompt. */
+
+.bmap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+.bmap__names {
+  min-width: 132px;
+  max-width: 230px;
+  margin: 0;
+  list-style: none;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.bmap__names li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.bmap__names li span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bmap__names li[data-live] {
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.bmap__names em {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--well);
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+/* Blue always means Layers did it. */
+.bmap__names li[data-kind='implicit'] em {
+  background: var(--agent-tint);
+  color: var(--agent-ink);
+}
+
+.bmap__scroll {
+  overflow-x: auto;
+}
+
+.bmap__map {
+  position: relative;
+  min-width: 100%;
+}
+
+.bmap__map svg {
+  display: block;
+}
+
+.bmap__stroke {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bmap__stroke--quiet {
+  stroke: var(--line-strong);
+}
+
+/* A line the conversation moved away from. */
+.bmap__stroke--left {
+  stroke: var(--line-strong);
+  stroke-dasharray: 2 6;
+}
+
+.bmap__stroke--fork-implicit {
+  stroke: var(--agent);
+  stroke-dasharray: 2 6;
+}
+
+.bmap__stroke--fork-promoted {
+  stroke: var(--agent);
+}
+
+.bmap__stroke--fork-explicit,
+.bmap__stroke--merge {
+  stroke: var(--ink-3);
+}
+
+.bmap__dot {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -12px 0 0 -12px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+}
+
+.bmap__dot::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  transition:
+    transform var(--t-fast),
+    background var(--t-med);
+}
+
+.bmap__dot[data-live]::after {
+  background: var(--ink);
+}
+
+.bmap__dot[data-away] {
+  opacity: 0.55;
+}
+
+/* Came back to a line that had been left: an open circle with the visit number in it. */
+.bmap__dot[data-reopened]::after {
+  inset: 3px;
+  border: 2px solid var(--ink);
+  background: var(--surface);
+}
+
+.bmap__dot span {
+  position: relative;
+  z-index: 1;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+
+button.bmap__dot:hover::after,
+.bmap__dot[aria-pressed='true']::after {
+  transform: scale(1.25);
+}
+
+.bmap__dot[aria-pressed='true']::after {
+  border-color: var(--agent);
+  background: var(--agent);
+}
+
+.bmap__dot[aria-pressed='true'] span {
+  color: #fff;
+}
+
+.bmap__dot:focus-visible,
+.bmap__fold:focus-visible {
+  outline: 2px solid var(--agent);
+}
+
+/* The count over a folded run. The zigzag itself is drawn in the map. */
+.bmap__fold {
+  position: absolute;
+  width: 40px;
+  height: 44px;
+  margin: -24px 0 0 -20px;
+  padding: 0 0 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.bmap__fold:hover {
+  color: var(--agent);
+}
+
+.bmap[data-size='small'] .bmap__names {
+  min-width: 112px;
+}
+
+.bmap[data-size='small'] .bmap__names li {
+  padding: 0 10px 0 12px;
+  font-size: 12px;
+}
+
+.bmap[data-size='small'] .bmap__dot {
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+}
+
+.bmap[data-size='small'] .bmap__dot::after {
+  inset: 5px;
+}
+
+.bmap[data-size='small'] .bmap__dot[data-reopened]::after {
+  inset: 2px;
+}
+
+.bmap[data-size='small'] .bmap__dot span {
+  font-size: 8px;
+}
+
+.bmap[data-size='small'] .bmap__fold {
+  height: 34px;
+  margin-top: -19px;
+  padding-bottom: 24px;
+  font-size: 9px;
+}
+
+/* The page that opens over the workspace: branches, and today so far. */
+
+.bpanel__veil {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(19 19 22 / 0.28);
+  animation: veil-in 160ms linear;
+}
+
+.bpanel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(900px, 100%);
+  max-height: min(780px, 100%);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--shadow-bubble);
+  outline: 0;
+  animation: panel-in 240ms var(--ease-out);
+}
+
+@keyframes veil-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+}
+
+.bpanel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bpanel__tabs {
+  display: flex;
+  padding: 3px;
+  border-radius: 11px;
+  background: var(--well);
+}
+
+/* The tab sits 3px inside its track, so its radius is 11 - 3. */
+.bpanel__tabs button {
+  height: 30px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 13.5px;
+  font-weight: 560;
+  color: var(--ink-2);
+}
+
+.bpanel__tabs button[aria-selected='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(19 19 22 / 0.12);
+}
+
+.bpanel__close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-3);
+}
+
+.bpanel__close:hover {
+  background: var(--well);
+  color: var(--ink);
+}
+
+.bpanel__body {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px 20px 22px;
+  overflow-y: auto;
+}
+
+.bpanel__body p,
+.bpanel__body h3,
+.bpanel__body ul,
+.bpanel__body dl {
+  margin: 0;
+}
+
+.bpanel__body h3 {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 640;
+}
+
+.bpanel__intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.bpanel__intro p {
+  max-width: 64ch;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.bpanel__btn {
+  flex: none;
+  height: 30px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--well);
+  font-size: 12.5px;
+  font-weight: 560;
+  white-space: nowrap;
+}
+
+.bpanel__btn:hover {
+  background: var(--well-press);
+}
+
+.bpanel__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.bpanel__legend li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.bpanel__legend li::before {
+  content: '';
+  flex: none;
+}
+
+.bpanel__legend li[data-key='dot']::before {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink);
+}
+
+.bpanel__legend li[data-key='back']::before {
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+}
+
+.bpanel__legend li[data-key='noticed']::before {
+  width: 18px;
+  border-top: 2px dotted var(--agent);
+}
+
+.bpanel__legend li[data-key='chat']::before {
+  width: 18px;
+  border-top: 2px solid var(--ink-3);
+}
+
+.bpanel__legend li[data-key='fold']::before {
+  width: 22px;
+  height: 10px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='10'%3E%3Cpath d='M1 5l3-4 5 8 5-8 5 8 2-4' fill='none' stroke='%236b6b76' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat center;
+}
+
+.bpanel__card {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--canvas);
+  animation: pop-in 180ms var(--ease-out);
+}
+
+.bpanel__kind {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.bpanel__kind b {
+  margin-right: 6px;
+  font-weight: 620;
+  color: var(--ink);
+}
+
+.bpanel__text {
+  font-size: 15px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.bpanel__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.bpanel__card .bpanel__btn {
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.bpanel__card .bpanel__btn:hover {
+  background: var(--well);
+}
+
+.bpanel__hint {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.bpanel__chats {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.bpanel__chats li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bpanel__chats li:last-child {
+  border-bottom: 0;
+}
+
+.bpanel__chat {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.bpanel__chat b {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bpanel__chat span,
+.bpanel__chats em {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+
+.bpanel__stats {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bpanel__stats div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--canvas);
+}
+
+.bpanel__stats dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.bpanel__stats dd {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 660;
+  font-variant-numeric: tabular-nums;
+}
+
+.bpanel__tasks {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.bpanel__tasks li {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto 76px;
+  align-items: center;
+  gap: 10px;
+}
+
+.bpanel__tasks em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.bpanel__n {
+  font-size: 12.5px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+.bpanel__bars {
+  display: grid;
+  gap: 9px;
+  padding: 0;
+  list-style: none;
+  font-size: 13.5px;
+}
+
+.bpanel__bars li {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) 24px;
+  align-items: center;
+  gap: 12px;
+}
+
+.bpanel__bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--well);
+}
+
+.bpanel__bar i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--agent);
+}
+
+.bpanel__bars b {
+  font-weight: 620;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bpanel :focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 2px;
+}
+
+/* Chats in the sidebar: a branch that became a chat sits under the chat it came from. */
+
+.side__nav li.side__chat {
+  padding: 0;
+  overflow: visible;
+}
+
+.side__chat button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.side__chat button:hover {
+  background: var(--well);
+}
+
+.side__chat button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side__chat[data-depth]:not([data-depth='0']) button {
+  animation: land 420ms var(--ease-out);
+}
+
+.side__turn {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin: -5px 1px 0 0;
+  border: solid var(--line-strong);
+  border-width: 0 0 1.5px 1.5px;
+  border-radius: 0 0 0 4px;
+}
+
+/* A chat Layers put together carries its blue. */
+.side__by {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--agent);
+}
+
+.side__chat button:focus-visible,
+.topbar__branches:focus-visible,
+.thread__mark button:focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 1px;
+}
+
+/* Top bar: which chat this is, and the way into the map. */
+
+/* The title stops short of the middle of the bar, where the demo's view switcher sits. */
+.topbar__title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  max-width: max(180px, calc(50vw - 410px));
+}
+
+.app[data-layout='focus'] .topbar__title {
+  max-width: max(180px, calc(50vw - 170px));
+}
+
+.topbar__title h1 {
+  flex: none;
+  max-width: 100%;
+}
+
+.topbar__crumb {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__right {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+}
+
+.topbar__branches {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  font-weight: 560;
+  transition: background var(--t-fast);
+}
+
+.topbar__branches:hover {
+  background: var(--canvas);
+}
+
+.topbar__branches svg {
+  color: var(--ink-3);
+}
+
+.topbar__branches b {
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-3);
+}
+
+/* In the thread: where a chat split off, and where a branch's own messages begin. */
+
+.thread__mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  animation: land 420ms var(--ease-out);
+}
+
+.thread__mark::before,
+.thread__mark::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.thread__mark b {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.thread__mark button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--agent-ink);
+}
+
+.thread__mark button:hover {
+  text-decoration: underline;
+}
+
+/* Settings: the agent's name. */
+
+.b-name input {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.b-name input:focus-visible {
+  outline: 2px solid var(--agent);
+  outline-offset: 1px;
+}
+
+/* A narrower window, or half of the side-by-side view: keep room for the chat's name. */
+@media (max-width: 1040px) {
+  .topbar__branches span,
+  .proj__title {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .bpanel__veil {
+    padding: 10px;
+  }
+
+  .bpanel__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bpanel__bars li {
+    grid-template-columns: 120px minmax(0, 1fr) 24px;
+  }
+
+  .bpanel__intro {
+    flex-direction: column;
+  }
+
+  .topbar__crumb,
+  .topbar__branches span {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bpanel,
+  .bpanel__veil,
+  .thread__mark {
+    animation: none;
+  }
+}

@@ -85,11 +85,18 @@ export interface Counters {
   reused: number;
 }
 
-export type Verdict =
+export type Verdict = (
   | { kind: 'pass' }
   | { kind: 'policy'; rule: Rule; reason: string; signals: Signals }
   | { kind: 'unsure'; rule: Rule; reason: string; signals: Signals }
-  | { kind: 'reuse'; item: KnowledgeItem; reason: string };
+  | { kind: 'reuse'; item: KnowledgeItem; reason: string }
+) & {
+  /**
+   * What the agent said the prompt is about, when it reviewed it. Null means it carries on
+   * with what the conversation was doing. Left out when only the quick screen looked.
+   */
+  topic?: { id: string; label: string } | null;
+};
 
 export interface CheckProgress {
   /** True when the quick screen could not clear the prompt and the agent is looking at it. */
@@ -124,8 +131,16 @@ export type AgentEvent =
 
 /** The contract between the UI and the Layers backend. */
 export interface LayersService {
-  /** Runs when the employee presses Send, before the prompt reaches the workspace model. */
-  preflight(prompt: string, onProgress: (p: CheckProgress) => void): Promise<Verdict>;
+  /**
+   * Runs when the employee presses Send, before the prompt reaches the workspace model.
+   * `where` names the direction the conversation is on and the others it has taken, so the
+   * agent can say whether this prompt leaves it.
+   */
+  preflight(
+    prompt: string,
+    onProgress: (p: CheckProgress) => void,
+    where?: { current: string | null; others: string[] },
+  ): Promise<Verdict>;
   /** Applies an approved workflow and reports each tool call as it happens. */
   applyWorkflow(itemId: string, prompt: string, onEvent: (e: AgentEvent) => void, signal: AbortSignal): Promise<void>;
   /** Answers a question about rules, limits or existing team work. Nothing is sent to the workspace model. */
@@ -148,6 +163,8 @@ export interface LayersService {
   reset?(): Promise<void>;
   /** Where an approval request stands, so the employee's side updates when the manager answers. */
   approvalStatus?(requestId: string): Promise<'pending' | 'approved' | 'declined'>;
+  /** The shape of the conversation's branches, for the manager. No prompt text is in it. */
+  branches?(outline: unknown): Promise<void>;
 }
 
 /** What the Layers overlay is showing right now. */
@@ -156,7 +173,15 @@ export type Scene =
   | { name: 'ask'; question: string; busy: boolean; answer: AskAnswer | null }
   | { name: 'checking'; engaged: boolean; note?: string }
   | { name: 'settings' }
-  | { name: 'branch'; lineId: string; label: string }
+  | {
+      name: 'branch';
+      lineId: string;
+      label: string;
+      /** noticed: a new direction. moved: Layers gave it its own chat. offer: Layers asks first. */
+      what: 'noticed' | 'moved' | 'offer';
+      /** The chat it split off from. */
+      from: string;
+    }
   | { name: 'policy'; prompt: string; rule: Rule; reason: string; signals: Signals; showRule: boolean }
   | { name: 'unsure'; prompt: string; rule: Rule; reason: string; signals: Signals }
   | { name: 'pending'; prompt: string; rule: Rule; requestId: string; approver: string; why?: string }

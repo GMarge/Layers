@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
+import { BranchMap } from '../branches/Map';
+import type { MapShape } from '../branches/model';
 import { EdgeGlow } from '../layers/EdgeGlow';
 import { MascotGlyph } from '../layers/Mascot';
 import type { Signals, Task } from '../layers/types';
 import { Check } from '../ui/icons';
 
 /**
- * The manager's side of Layers. It shows a prompt only when the employee sent it for
- * approval. Everything else is counts and outcomes, never what was typed.
+ * The manager's side of Layers: the whole team at a glance, then one person at a time.
+ * It shows a prompt only when the employee sent it for approval. Everything else is
+ * counts, outcomes and the shape of the conversation, never what was typed.
  */
 
 interface Pending {
@@ -18,22 +21,52 @@ interface Pending {
   from: string;
 }
 
-interface ManagerData {
-  manager: string;
-  employee: { name: string; role: string; team: string };
+interface Member {
+  id: string;
+  name: string;
+  role: string;
+  team: string;
+  /** A sample teammate, shown so the page reads as a team. Only the live one is connected. */
+  sample: boolean;
   project: { name: string; title: string; due: string };
-  pending: Pending[];
-  feed: { ts: number; text: string }[];
   tasks: Task[];
   counts: { checked: number; passed: number; held: number; reused: number };
+  pending: number;
+  feed: { ts?: number; text: string }[];
+  branches: MapShape | null;
+}
+
+interface ManagerData {
+  manager: string;
+  project: { name: string; title: string; due: string };
+  pending: Pending[];
+  team: Member[];
 }
 
 const clock = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** The branch map in words, for the line under it. */
+function describe(shape: MapShape): string {
+  const noticed = shape.lines.filter((l) => l.kind === 'implicit');
+  const chats = shape.lines.filter((l) => l.kind === 'explicit');
+  const grouped = chats.filter((l) => l.promoted).length;
+  const parts = [plural(shape.nodes.length, 'prompt', 'prompts')];
+  if (noticed.length > 0) {
+    const merged = noticed.filter((l) => l.merged).length;
+    parts.push(`${plural(noticed.length, 'direction', 'directions')} noticed${merged ? `, ${merged} merged back` : ''}`);
+  }
+  if (chats.length > 0) {
+    parts.push(`${plural(chats.length, 'branch chat', 'branch chats')}${grouped ? `, ${grouped} grouped by Layers` : ''}`);
+  }
+  return `${parts.join('. ')}.`;
+}
 
 export function ManagerView() {
   const [data, setData] = useState<ManagerData | null>(null);
   const [offline, setOffline] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [chosen, setChosen] = useState('jordan');
 
   const load = () =>
     fetch('/api/manager')
@@ -69,8 +102,10 @@ export function ManagerView() {
     );
   }
 
-  const first = data.employee.name.split(' ')[0];
-  const done = data.tasks.filter((t) => t.status === 'done').length;
+  const member = data.team.find((m) => m.id === chosen) ?? data.team[0]!;
+  const first = member.name.split(' ')[0];
+  const done = member.tasks.filter((t) => t.status === 'done').length;
+  const team = data.team[0]?.team ?? 'Your';
 
   return (
     <div className="root">
@@ -78,10 +113,10 @@ export function ManagerView() {
         <header className="mgr__top">
           <div>
             <h1>
-              {data.project.name} <span>{data.project.title}</span>
+              {team} team <span>AI workspace</span>
             </h1>
             <p>
-              {data.manager}, managing {data.employee.name}. Due {data.project.due}.
+              {data.manager}, managing {plural(data.team.length, 'person', 'people')}.
             </p>
           </div>
           <p className="mgr__who">
@@ -126,7 +161,7 @@ export function ManagerView() {
                 )}
                 {p.note && (
                   <p className="mgr__note">
-                    {first}'s note: {p.note}
+                    {p.from.split(' ')[0]}'s note: {p.note}
                   </p>
                 )}
                 <div className="mgr__acts">
@@ -142,58 +177,132 @@ export function ManagerView() {
           )}
         </section>
 
-        <div className="mgr__cols">
-          <section aria-labelledby="happened">
-            <h2 id="happened">What happened</h2>
-            <p className="mgr__counts">
-              <span>
-                <b>{data.counts.checked}</b>checked
-              </span>
-              <span>
-                <b>{data.counts.passed}</b>went straight through
-              </span>
-              <span>
-                <b>{data.counts.held}</b>held
-              </span>
-              <span>
-                <b>{data.counts.reused}</b>reused
-              </span>
-            </p>
-            {data.feed.length === 0 ? (
-              <p className="mgr__empty">No activity yet in this session.</p>
-            ) : (
-              <ol className="mgr__feed">
-                {data.feed.map((f, i) => (
-                  <li key={`${f.ts}-${i}`}>
-                    <time>{clock(f.ts)}</time>
-                    <span>{f.text}</span>
+        <section aria-labelledby="team">
+          <h2 id="team">Team</h2>
+          <div className="mgr__team">
+            {data.team.map((m) => {
+              const finished = m.tasks.filter((t) => t.status === 'done').length;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="mgr__member"
+                  aria-pressed={m.id === member.id}
+                  onClick={() => setChosen(m.id)}
+                >
+                  <span className="mgr__name">
+                    {m.name}
+                    <span className="mgr__tag" data-live={m.sample ? undefined : ''}>
+                      {m.sample ? 'Sample' : 'Live'}
+                    </span>
+                  </span>
+                  <span className="mgr__proj">
+                    {m.role}. <b>{m.project.name}</b> {m.project.title}
+                  </span>
+                  <span className="mgr__meter" aria-hidden="true">
+                    <i style={{ width: `${(finished / Math.max(1, m.tasks.length)) * 100}%` }} />
+                  </span>
+                  <span className="mgr__line">
+                    <span>
+                      {finished} of {m.tasks.length} tasks done
+                    </span>
+                    {m.pending > 0 ? (
+                      <span className="mgr__wait">{m.pending} waiting on you</span>
+                    ) : (
+                      <span>
+                        {m.counts.checked} checked, {m.counts.held} held
+                      </span>
+                    )}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section aria-labelledby="person" key={member.id} className="mgr__person">
+          <h2 id="person">
+            {member.name}
+            <span>
+              {member.project.name}, {member.project.title.toLowerCase()}. Due {member.project.due}.
+            </span>
+          </h2>
+
+          <div className="mgr__cols">
+            <div className="mgr__col">
+              <h3>What happened</h3>
+              <p className="mgr__counts">
+                <span>
+                  <b>{member.counts.checked}</b>checked
+                </span>
+                <span>
+                  <b>{member.counts.passed}</b>went straight through
+                </span>
+                <span>
+                  <b>{member.counts.held}</b>held
+                </span>
+                <span>
+                  <b>{member.counts.reused}</b>reused
+                </span>
+              </p>
+              {member.feed.length === 0 ? (
+                <p className="mgr__empty">No activity yet in this session.</p>
+              ) : (
+                <ol className="mgr__feed" data-plain={member.sample ? '' : undefined}>
+                  {member.feed.map((f, i) => (
+                    <li key={`${f.ts ?? 's'}-${i}`}>
+                      {f.ts != null && <time>{clock(f.ts)}</time>}
+                      <span>{f.text}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+
+            <div className="mgr__col">
+              <h3>
+                Progress{' '}
+                <span>
+                  {done} of {member.tasks.length} done
+                </span>
+              </h3>
+              <ul className="proj__tasks mgr__tasks">
+                {member.tasks.map((t) => (
+                  <li key={t.id} data-status={t.status}>
+                    <span className="proj__mark" aria-hidden="true">
+                      {t.status === 'done' && <Check />}
+                    </span>
+                    <span>{t.title}</span>
+                    {t.status === 'doing' && <em>In progress</em>}
                   </li>
                 ))}
-              </ol>
-            )}
-          </section>
+              </ul>
+            </div>
+          </div>
 
-          <section aria-labelledby="progress">
-            <h2 id="progress">
-              Progress <span>{done} of {data.tasks.length} done</span>
-            </h2>
-            <ul className="proj__tasks mgr__tasks">
-              {data.tasks.map((t) => (
-                <li key={t.id} data-status={t.status}>
-                  <span className="proj__mark" aria-hidden="true">
-                    {t.status === 'done' && <Check />}
-                  </span>
-                  <span>{t.title}</span>
-                  {t.status === 'doing' && <em>In progress</em>}
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
+          <div className="mgr__col">
+            <h3>
+              Branches <span>how {first}'s conversation has split</span>
+            </h3>
+            {member.branches ? (
+              <>
+                <BranchMap shape={member.branches} size="small" />
+                <p className="mgr__empty">
+                  {describe(member.branches)} A dot is a prompt, and a number marks coming back to a line. Each line is
+                  named by the part of the project it is on. What {first} typed is not shown.
+                </p>
+              </>
+            ) : (
+              <p className="mgr__empty">No branch map yet. It appears once {first}'s workspace is open.</p>
+            )}
+          </div>
+        </section>
 
         <p className="mgr__fine">
-          You see a prompt only when {first} sends it to you for approval. Everything else appears as counts and
-          outcomes. Demo data: the company and people are fictional.
+          You see a prompt only when someone sends it to you for approval. Everything else appears as counts, outcomes
+          and the shape of the conversation. {data.team.filter((m) => !m.sample).map((m) => m.name.split(' ')[0]).join(', ')}{' '}
+          is live. Teammates marked Sample are example data, there to show how a team looks. The company and people are
+          fictional.
         </p>
       </main>
       <EdgeGlow mode={data.pending.length > 0 ? 'unsure' : 'ambient'} variant="glow" quiet={false} />

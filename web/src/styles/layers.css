@@ -1191,7 +1191,7 @@ li[data-status='done'] .steps__mark {
   position: fixed;
   top: 68px;
   left: 50%;
-  z-index: 60;
+  z-index: 95;
   max-width: calc(100vw - 32px);
   padding: 10px 14px;
   border-radius: 12px;

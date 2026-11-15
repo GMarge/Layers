@@ -47,9 +47,9 @@ async function stream(path: string, body: unknown, onEvent: (e: Record<string, u
 }
 
 const service: LayersService = {
-  async preflight(prompt, onProgress) {
+  async preflight(prompt, onProgress, where) {
     let verdict: Verdict | null = null;
-    await stream('preflight', { prompt }, (e) => {
+    await stream('preflight', { prompt, ...where }, (e) => {
       if (e.type === 'progress') onProgress(e as unknown as CheckProgress);
       else if (e.type === 'verdict') verdict = e.verdict as Verdict;
       else if (e.type === 'error') throw new Error(String(e.message));
@@ -105,6 +105,10 @@ const service: LayersService = {
 
   async reset() {
     await post('reset', {});
+  },
+
+  async branches(outline) {
+    await post('branches', outline);
   },
 };
 

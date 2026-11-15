@@ -185,7 +185,7 @@ kbd {
 
 .main {
   display: grid;
-  grid-template-rows: 56px auto minmax(0, 1fr) auto;
+  grid-template-rows: 56px minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--surface);

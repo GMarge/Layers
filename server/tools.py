@@ -188,14 +188,18 @@ def request_manager_approval(prompt: str, reason: str) -> str:
     return _traced("request_manager_approval", body)
 
 
-def submit_verdict(kind: str, reason: str, workflow_id: str = "") -> str:
+def submit_verdict(kind: str, reason: str, workflow_id: str = "", topic: str = "") -> str:
     """Give your finding on a prompt. kind is one of: pass, policy, unsure, reuse.
-    reason is one or two plain sentences for the employee. For reuse, give the workflow_id."""
+    reason is one or two plain sentences for the employee. For reuse, give the workflow_id.
+    topic is the direction the prompt belongs to: one of the direction names given in the task,
+    written exactly, or two or three plain words naming a new direction."""
     def body():
         if kind not in ("pass", "policy", "unsure", "reuse"):
             raise ValueError("kind must be pass, policy, unsure or reuse")
-        _scratch["verdict"] = {"kind": kind, "reason": reason.strip(), "workflow_id": workflow_id}
-        return "Recorded.", kind
+        _scratch["verdict"] = {"kind": kind, "reason": reason.strip(), "workflow_id": workflow_id,
+                               "topic": str(topic).strip()}
+        said = str(topic).strip()[:40]
+        return "Recorded.", f"{kind}, direction: {said}" if said else kind
     return _traced("submit_verdict", body)
 
 

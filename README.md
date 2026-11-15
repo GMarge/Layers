@@ -13,9 +13,11 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 - **Already built:** if the team has an approved workflow for the request, Layers offers it and, on a click, applies it to the project.
 - **Not sure:** Layers says so, shows what counted each way, and follows the company's choice: ask the employee, let it through and log it, or hand it to a person.
 
-- **Branches:** a map above the chat shows each prompt as a dot. When the conversation moves to a different part of the project, Layers puts it on its own branch without being asked. The employee can also branch on purpose, merge a branch back, or jump between them. Each branch only gives the model its own history.
+- **Branches:** when the conversation moves to a different part of the project, Layers gives that direction its own line without being asked (an implicit branch). When the employee keeps coming back to the same direction, Layers moves it into a chat of its own (an explicit branch), listed under the chat it came from, and says so with a one-key undo. The employee can also start a chat from any earlier prompt, merge lines back one at a time or all at once, and put a chat back where it came from. Each chat only gives the model its own history plus what it shared before it split.
+- **The branch map:** right-click the agent, or use the Branches button, for a page that draws the conversation: one row per line, one dot per prompt, a number where the employee came back to a line, and a zigzag for a long unbroken run. A second tab, "Today so far", reads progress from the branches and the task list.
+- **The manager's view** (`#manager`): approval requests with the reason and the words that triggered them, then the team, then one person at a time with their activity, task progress and branch map.
 
-The employee can also ask Layers a question before sending anything, move it, hide it, and change how it looks.
+The employee can also ask Layers a question before sending anything, move it, hide it, rename it, and change how it looks.
 
 ## How it works
 
@@ -37,6 +39,7 @@ flowchart TD
 - **A person approves.** Only the manager endpoint can approve a held prompt.
 - **It adapts.** When the employee explains how a prompt connects to the project, Layers remembers the distinctive words and stops flagging that kind of request. No model is trained.
 - **Everything is logged.** Each tool call is timed, shown to the employee in plain English, and written to the audit log.
+- **Branching follows meaning when the agent has looked.** A prompt with clear project keywords is placed by those keywords, which costs nothing. A prompt the agent reviews anyway comes back with the direction it belongs to, chosen from the directions the conversation has taken, in the same model run.
 
 ## Run it
 
@@ -56,10 +59,10 @@ Check the agent wiring without a key: `.venv/bin/python -m tests.test_agent_wiri
 
 | | |
 |---|---|
-| Real | The gate, the tools, the database, approvals, the audit log, the adaptive word list, the DeepAgents harness (tested with a stand-in model) |
-| Needs a model key | The agent's own judgment on unclear prompts, and answers from the workspace model |
-| Seeded | The company, people, project, rules and workflows are fictional demo data |
-| Not built | Integration with ChatGPT or other tools, a manager inbox, real accounts and sign-in |
+| Real | The gate, the tools, the database, approvals and the manager's view of them, the audit log, the adaptive word list, the branch map and chats, the DeepAgents harness (tested with a stand-in model) |
+| Needs a model key | The agent's own judgment on unclear prompts, its reading of which direction a prompt belongs to, and answers from the workspace model |
+| Seeded | The company, people, project, rules and workflows are fictional demo data. On the manager's page one employee is live; the two teammates marked "Sample" are example data |
+| Not built | Running over ChatGPT or other tools, real accounts and sign-in, keeping chats after a refresh, more than one live employee or project |
 
 No time or money savings are claimed. The only numbers shown are counts and tool timings measured in the session.
 
@@ -68,4 +71,5 @@ No time or money savings are claimed. The only numbers shown are counts and tool
 - Layers reads a prompt only when the employee presses Send in this workspace, and the page says so.
 - It never deletes a draft. Every intervention can be undone or appealed.
 - The employee's identity is fixed on the server; no tool takes it from the model or the browser.
+- The manager sees a prompt only when the employee sends it for approval. The branch map the manager gets is the shape of the conversation and one of four fixed project areas per line. The endpoint that receives it has no field that could carry what was typed.
 - The agent has no shell and no access to real files. Keys live in `.env`, which is not committed.

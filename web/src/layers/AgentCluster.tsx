@@ -109,10 +109,13 @@ interface Props {
   onReserveChange: (px: number) => void;
   /** Reports when the agent is being held over the chat box. */
   onOverBoxChange: (over: boolean) => void;
+  /** Open the page with the branch map, or today so far. */
+  onOpenPanel: (tab: 'branches' | 'today') => void;
 }
 
 export function AgentCluster(props: Props) {
   const { scene, placement, rest, reducedMotion } = props;
+  const name = props.prefs.name;
   const clusterRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const narrow = useMediaQuery('(max-width: 640px)');
@@ -336,8 +339,12 @@ export function AgentCluster(props: Props) {
       {menu && (
         <AgentMenu
           at={menu}
-          label={hiddenNow ? 'Show Layers' : 'Hide Layers'}
-          onChoose={chooseMenu}
+          name={name}
+          items={[
+            { label: 'Branches', onChoose: () => (setMenu(null), props.onOpenPanel('branches')) },
+            { label: 'Today so far', onChoose: () => (setMenu(null), props.onOpenPanel('today')) },
+            { label: hiddenNow ? `Show ${name}` : `Hide ${name}`, hint: 'Alt L', onChoose: chooseMenu },
+          ]}
           onClose={() => setMenu(null)}
         />
       )}
@@ -354,7 +361,7 @@ export function AgentCluster(props: Props) {
         grabbed={!!drag}
         over={over}
         draggable={!emerging && presence !== 'gone' && scene.name !== 'working' && scene.name !== 'checking'}
-        label={speaking ? 'Layers. Drag to move.' : 'Layers. Ask a question, or drag to move.'}
+        label={speaking ? `${name}. Drag to move.` : `${name}. Ask a question, or drag to move.`}
         onClick={props.onMascotClick}
         onMenu={(at) => {
           if (!busy) setMenu(at);

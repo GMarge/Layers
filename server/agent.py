@@ -38,6 +38,9 @@ REVIEW a prompt the employee tried to send:
    - policy: it is clearly unrelated to the project, including general knowledge, homework or
      personal questions with no link to the brief.
    - unsure: you cannot tell. Say what points each way. Never guess.
+   Always give topic as well, so the conversation can be kept in order. The task lists the
+   directions the conversation has taken. Give the one this prompt belongs to, written exactly,
+   or two or three plain words for a new direction when it is about something none of them cover.
 Write the reason in one or two plain sentences, no jargon. Describe the prompt itself and do not
 use "you" or "your", because the employee's manager may read it too.
 

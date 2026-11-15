@@ -30,6 +30,29 @@ export interface LabSettings {
   glow: GlowLevel;
   layout: LayoutStyle;
   reduceMotion: boolean;
+  /** What the employee calls their agent. */
+  name: string;
+}
+
+export const DEFAULT_NAME = 'Layers';
+const NAME_KEY = 'layers.name';
+
+/** The name is the employee's own choice, so it is remembered on their device. */
+export function loadName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY)?.trim().slice(0, 16) || DEFAULT_NAME;
+  } catch {
+    return DEFAULT_NAME;
+  }
+}
+
+export function saveName(name: string) {
+  try {
+    if (name === DEFAULT_NAME) localStorage.removeItem(NAME_KEY);
+    else localStorage.setItem(NAME_KEY, name);
+  } catch {
+    // Private windows can refuse storage. The name just won't be remembered.
+  }
 }
 
 export const defaultLab: LabSettings = {
@@ -46,6 +69,7 @@ export const defaultLab: LabSettings = {
   glow: 'standard',
   layout: 'sidebar',
   reduceMotion: false,
+  name: DEFAULT_NAME,
 };
 
 const SCENES: [LabScene, string][] = [

@@ -6,7 +6,7 @@ import './styles/tokens.css';
 import './styles/workspace.css';
 import './styles/layers.css';
 import './styles/lab.css';
-import './styles/rail.css';
+import './styles/branches.css';
 import './styles/bubble-extra.css';
 import App from './App';
 import { ManagerView } from './manager/ManagerView';
@@ -38,7 +38,7 @@ function Root() {
   return (
     <>
       <div style={{ display: view === 'employee' ? 'contents' : 'none' }}>
-        <App />
+        <App active={view === 'employee'} />
       </div>
       {view === 'manager' && <ManagerView />}
       {view === 'both' && (

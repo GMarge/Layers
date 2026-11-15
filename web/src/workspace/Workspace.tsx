@@ -8,8 +8,41 @@ import { company, conversations, employee, project, rules } from './data';
  * quiet and neutral so that everything blue on screen is Layers.
  */
 
+/** One chat in the list. A branch that became a chat sits under the chat it came from. */
+export interface ChatEntry {
+  id: string;
+  title: string;
+  depth: number;
+  current: boolean;
+  /** Layers put this chat together. */
+  byLayers: boolean;
+}
+
+/** A place in the thread where a chat split off this one. */
+export interface ForkMark {
+  id: string;
+  /** It goes before the first message at or after this position. */
+  seq: number;
+  title: string;
+  prompts: number;
+  byLayers: boolean;
+}
+
 interface Props {
   messages: Message[];
+  /** What the employee calls their agent. */
+  agentName: string;
+  chats: ChatEntry[];
+  onOpenChat(id: string): void;
+  /** The open chat's name, and the chat it branched from if it did. */
+  title: string;
+  crumb: string | null;
+  /** Chats that split off the open one. */
+  marks: ForkMark[];
+  /** Where the open chat's own messages begin, when it is a branch. */
+  origin: { seq: number; title: string; byLayers: boolean } | null;
+  branchCount: number;
+  onOpenBranches(): void;
   tasks: Task[];
   draft: string;
   hold: Hold | null;
@@ -26,8 +59,6 @@ interface Props {
   /** Room Layers needs above the chat box. The thread leaves it free. */
   reserve: number;
   sidebarSlot?: ReactNode;
-  /** The conversation map, shown under the top bar. */
-  railSlot?: ReactNode;
   onDraftChange(text: string): void;
   onSend(): void;
   onReview(): void;
@@ -205,7 +236,22 @@ function Rich({ text }: { text: string }) {
   return <div className="msg__md">{blocks}</div>;
 }
 
-function MessageRow({ message: m }: { message: Message }) {
+const BranchIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+    <path
+      d="M3.5 2.5v9M3.5 8c0-2.5 7-1.5 7-4.5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <circle cx="3.5" cy="2.5" r="1.4" fill="currentColor" />
+    <circle cx="3.5" cy="11.5" r="1.4" fill="currentColor" />
+    <circle cx="10.5" cy="3.5" r="1.4" fill="currentColor" />
+  </svg>
+);
+
+function MessageRow({ message: m, agentName }: { message: Message; agentName: string }) {
   if (m.role === 'user')
     return (
       <div className="msg msg--user" data-seq={m.seq ?? 0}>
@@ -218,7 +264,7 @@ function MessageRow({ message: m }: { message: Message }) {
       <div className="msg msg--layers">
         <p className="msg__who">
           <span className="msg__mark" aria-hidden="true" />
-          Layers
+          {agentName}
         </p>
         {m.text && <p className="msg__text">{m.text}</p>}
         {m.artifact && <Sheet artifact={m.artifact} />}
@@ -269,6 +315,41 @@ export function Workspace(p: Props) {
 
   const pending = p.hold?.kind === 'pending';
 
+  // The thread, with a line wherever another chat split off and where this chat's own part begins.
+  const rows: ReactNode[] = [];
+  const marks = [...p.marks].sort((a, b) => a.seq - b.seq);
+  let originShown = !p.origin;
+  const markRow = (mark: ForkMark) => (
+    <p className="thread__mark" key={`mark-${mark.id}`}>
+      <span>
+        {mark.byLayers ? `${p.agentName} moved` : 'You branched'} <b>{mark.title}</b> into its own chat
+        {mark.prompts > 0 && `, ${mark.prompts} ${mark.prompts === 1 ? 'prompt' : 'prompts'}`}.{' '}
+        <button type="button" onClick={() => p.onOpenChat(mark.id)}>
+          Open it
+        </button>
+      </span>
+    </p>
+  );
+  const originRow = () => (
+    <p className="thread__mark" key="origin">
+      <span>
+        {p.origin!.byLayers ? `${p.agentName} branched this chat` : 'This chat branched'} from <b>{p.origin!.title}</b>{' '}
+        here. Everything above is shared.
+      </span>
+    </p>
+  );
+  for (const m of p.messages) {
+    const at = m.seq ?? 0;
+    while (marks[0] && marks[0].seq <= at) rows.push(markRow(marks.shift()!));
+    if (!originShown && at >= p.origin!.seq) {
+      rows.push(originRow());
+      originShown = true;
+    }
+    rows.push(<MessageRow key={m.id} message={m} agentName={p.agentName} />);
+  }
+  for (const mark of marks) rows.push(markRow(mark));
+  if (!originShown) rows.push(originRow());
+
   return (
     <div className="app" data-layout={p.layout}>
       <aside className="side">
@@ -281,10 +362,27 @@ export function Workspace(p: Props) {
         <nav className="side__nav" aria-label="Conversations">
           <p className="side__label">Recent</p>
           <ul>
-            {conversations.map((title, i) => (
-              <li key={title} aria-current={i === 0 ? 'page' : undefined}>
-                {title}
+            {p.chats.map((chat) => (
+              <li
+                key={chat.id}
+                className="side__chat"
+                data-depth={chat.depth}
+                aria-current={chat.current ? 'page' : undefined}
+              >
+                <button
+                  type="button"
+                  style={{ paddingLeft: 8 + chat.depth * 14 }}
+                  title={chat.byLayers ? `${chat.title}, grouped by ${p.agentName}` : chat.title}
+                  onClick={() => p.onOpenChat(chat.id)}
+                >
+                  {chat.depth > 0 && <i className="side__turn" aria-hidden="true" />}
+                  <span>{chat.title}</span>
+                  {chat.byLayers && <i className="side__by" aria-hidden="true" />}
+                </button>
               </li>
+            ))}
+            {conversations.slice(1).map((title) => (
+              <li key={title}>{title}</li>
             ))}
           </ul>
         </nav>
@@ -305,17 +403,22 @@ export function Workspace(p: Props) {
 
       <main className="main">
         <header className="topbar">
-          <h1>{conversations[0]}</h1>
-          <ProjectChip tasks={p.tasks} />
+          <div className="topbar__title">
+            <h1>{p.title}</h1>
+            {p.crumb && <span className="topbar__crumb">from {p.crumb}</span>}
+          </div>
+          <div className="topbar__right">
+            <button type="button" className="topbar__branches" aria-haspopup="dialog" onClick={p.onOpenBranches}>
+              <BranchIcon />
+              <span>Branches</span>
+              <b>{p.branchCount}</b>
+            </button>
+            <ProjectChip tasks={p.tasks} />
+          </div>
         </header>
-        {p.railSlot}
 
         <div className="thread" ref={threadRef}>
-          <div className="thread__col">
-            {p.messages.map((m) => (
-              <MessageRow key={m.id} message={m} />
-            ))}
-          </div>
+          <div className="thread__col">{rows}</div>
         </div>
 
         <div className="dock">
@@ -345,7 +448,7 @@ export function Workspace(p: Props) {
                 rows={1}
                 value={p.draft}
                 readOnly={pending}
-                placeholder={p.dropReady ? 'Let go to tuck Layers in here' : `Ask about ${project.name}`}
+                placeholder={p.dropReady ? `Let go to tuck ${p.agentName} in here` : `Ask about ${project.name}`}
                 aria-label={`Message ${company.assistant}`}
                 onChange={(e) => p.onDraftChange(e.target.value)}
                 onKeyDown={onKeyDown}
@@ -370,7 +473,7 @@ export function Workspace(p: Props) {
               </>
             ) : p.layersHidden ? (
               <>
-                Layers is hidden and still checks each prompt when you press Send.{' '}
+                {p.agentName} is hidden and still checks each prompt when you press Send.{' '}
                 <button type="button" onClick={p.onShowLayers}>
                   Show it
                 </button>{' '}
@@ -378,7 +481,7 @@ export function Workspace(p: Props) {
               </>
             ) : (
               <>
-                Layers checks each prompt against your project and the workspace rules when you press Send.{' '}
+                {p.agentName} checks each prompt against your project and the workspace rules when you press Send.{' '}
                 <button type="button" onClick={p.onOpenRules}>
                   See the rules
                 </button>

@@ -214,6 +214,135 @@
   color: var(--ink-3);
 }
 
+/* The team: one card per person. The chosen one is shown in full below. */
+
+.mgr__team {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mgr__member {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 14px 16px 15px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color var(--t-fast),
+    box-shadow var(--t-fast);
+}
+
+.mgr__member:hover {
+  border-color: var(--line-strong);
+}
+
+.mgr__member[aria-pressed='true'] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.mgr__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 640;
+}
+
+.mgr__tag {
+  flex: none;
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: var(--well);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.mgr__tag[data-live] {
+  background: var(--agent-tint);
+  color: var(--agent-ink);
+}
+
+.mgr__proj {
+  min-height: 2.9em;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.mgr__proj b {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.mgr__meter {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--well);
+}
+
+.mgr__meter i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ink);
+  transition: width var(--t-slow) var(--ease-out);
+}
+
+.mgr__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.mgr__wait {
+  font-weight: 600;
+  color: var(--agent-ink);
+}
+
+.mgr__person {
+  gap: 22px !important;
+  animation: land 320ms var(--ease-out);
+}
+
+.mgr__col {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mgr h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 640;
+}
+
+.mgr h3 span {
+  font-size: 12.5px;
+  font-weight: 440;
+  color: var(--ink-3);
+}
+
+/* Sample activity has no times, so it is a plain list. */
+.mgr__feed[data-plain] li {
+  grid-template-columns: 1fr;
+}
+
 .mgr__fine {
   padding-top: 16px;
   border-top: 1px solid var(--line);
@@ -227,9 +356,17 @@
 }
 
 @media (max-width: 720px) {
-  .mgr__cols {
+  .mgr__cols,
+  .mgr__team {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mgr__cols {
     gap: 28px;
+  }
+
+  .mgr__proj {
+    min-height: 0;
   }
 }
 

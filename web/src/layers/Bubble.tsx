@@ -1,7 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react';
 import { ArrowUp, Check, Close } from '../ui/icons';
 import { manager, project, rules } from '../workspace/data';
-import type { EyeStyle, OutlineStyle } from '../lab/DesignLab';
+import { DEFAULT_NAME, type EyeStyle, type OutlineStyle } from '../lab/DesignLab';
 import { MascotGlyph, SHAPES, type Shape } from './Mascot';
 import type { Counters, KnowledgeItem, PolicyMode, RestMode, Scene, Signals, Step, Todo, UnsureMode } from './types';
 
@@ -15,6 +15,8 @@ export interface Prefs {
   outline: OutlineStyle;
   policyMode: PolicyMode;
   unsureMode: UnsureMode;
+  /** What the employee calls the agent. */
+  name: string;
 }
 
 export interface BubbleActions {
@@ -42,7 +44,13 @@ export interface BubbleActions {
   mergeBranch(lineId: string): void;
   /** Make a direction Layers split off into a chat of its own. */
   detachBranch(lineId: string): void;
-  setPrefs(change: Partial<Pick<Prefs, 'shape' | 'eyes' | 'rest' | 'outline'>>): void;
+  /** Put a chat Layers made back inside the chat it came from. */
+  foldBranch(lineId: string): void;
+  /** Leave a line where it is, and stop offering to move it. */
+  leaveBranch(lineId: string): void;
+  /** Open the page with the branch map. */
+  openBranches(): void;
+  setPrefs(change: Partial<Pick<Prefs, 'shape' | 'eyes' | 'rest' | 'outline' | 'name'>>): void;
   /** Hide the agent completely, or bring it back. */
   toggleHidden(): void;
   dismiss(): void;
@@ -205,7 +213,30 @@ function RuleList() {
   );
 }
 
-function AskForm({ onAsk, disabled }: { onAsk: (question: string) => void; disabled: boolean }) {
+/** The agent's name. It can be cleared while typing, and falls back to Layers if left empty. */
+function NameField({ name, onChange }: { name: string; onChange: (name: string) => void }) {
+  const [value, setValue] = useState(name);
+  return (
+    <label className="b-set b-name">
+      <span>Name</span>
+      <input
+        type="text"
+        value={value}
+        maxLength={16}
+        placeholder={DEFAULT_NAME}
+        autoComplete="off"
+        spellCheck={false}
+        onChange={(e) => {
+          setValue(e.target.value);
+          onChange(e.target.value.trim() || DEFAULT_NAME);
+        }}
+        onBlur={() => setValue(value.trim() || DEFAULT_NAME)}
+      />
+    </label>
+  );
+}
+
+function AskForm({ name, onAsk, disabled }: { name: string; onAsk: (question: string) => void; disabled: boolean }) {
   const [value, setValue] = useState('');
   return (
     <form
@@ -221,7 +252,7 @@ function AskForm({ onAsk, disabled }: { onAsk: (question: string) => void; disab
         type="text"
         value={value}
         placeholder="Am I allowed to…"
-        aria-label="Ask Layers"
+        aria-label={`Ask ${name}`}
         autoComplete="off"
         onChange={(e) => setValue(e.target.value)}
       />
@@ -335,7 +366,7 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
                   wait.
                 </p>
               )}
-              <AskForm onAsk={a.ask} disabled={scene.busy} />
+              <AskForm name={prefs.name} onAsk={a.ask} disabled={scene.busy} />
               {fresh && (
                 <div className="b-chips">
                   {hasDraft && (
@@ -464,6 +495,65 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
       };
 
     case 'branch':
+      // Layers already moved it: say so, and make it one key to put back.
+      if (scene.what === 'moved') {
+        return {
+          dismissible: true,
+          shortcuts: { k: a.dismiss, u: () => a.foldBranch(scene.lineId) },
+          takeFocus: true,
+          node: (
+            <>
+              <div className="b-main">
+                <h2 className="b-title">You keep coming back to {scene.label}.</h2>
+                <p className="b-text">
+                  So I gave it a chat of its own and moved its prompts there together. {scene.from} carries on without
+                  them.
+                </p>
+                <button type="button" className="b-link" onClick={a.openBranches}>
+                  See the branch map
+                </button>
+              </div>
+              <div className="b-actions">
+                <Act primary hint="K" onClick={a.dismiss}>
+                  Keep it
+                </Act>
+                <Act hint="U" onClick={() => a.foldBranch(scene.lineId)}>
+                  Put it back
+                </Act>
+              </div>
+            </>
+          ),
+        };
+      }
+      if (scene.what === 'offer') {
+        return {
+          dismissible: true,
+          shortcuts: { m: () => a.detachBranch(scene.lineId), n: () => a.leaveBranch(scene.lineId) },
+          takeFocus: true,
+          node: (
+            <>
+              <div className="b-main">
+                <h2 className="b-title">You keep coming back to {scene.label}.</h2>
+                <p className="b-text">
+                  Want it as a chat of its own? Its prompts move there together, and {scene.from} carries on without
+                  them.
+                </p>
+                <button type="button" className="b-link" onClick={a.openBranches}>
+                  See the branch map
+                </button>
+              </div>
+              <div className="b-actions">
+                <Act primary hint="M" onClick={() => a.detachBranch(scene.lineId)}>
+                  Make it a chat
+                </Act>
+                <Act hint="N" onClick={() => a.leaveBranch(scene.lineId)}>
+                  Leave it
+                </Act>
+              </div>
+            </>
+          ),
+        };
+      }
       return {
         dismissible: true,
         shortcuts: { k: a.dismiss, m: () => a.mergeBranch(scene.lineId) },
@@ -473,7 +563,10 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
             <div className="b-main">
               <h2 className="b-title">This is a new direction: {scene.label}.</h2>
               <p className="b-text">
-                I put it on its own branch so the earlier thread stays intact. You can see it on the map above.
+                I put it on its own branch so the earlier thread stays intact.{' '}
+                <button type="button" className="b-link" onClick={a.openBranches}>
+                  See the branch map
+                </button>
               </p>
               <button type="button" className="b-link" onClick={() => a.detachBranch(scene.lineId)}>
                 Make it a separate chat
@@ -496,7 +589,8 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
         dismissible: true,
         node: (
           <div className="b-main">
-            <h2 className="b-title">Layers settings</h2>
+            <h2 className="b-title">{prefs.name} settings</h2>
+            <NameField name={prefs.name} onChange={(name) => a.setPrefs({ name })} />
             <div className="b-shapes" role="group" aria-label="How I look">
               {(Object.keys(SHAPES) as Shape[]).map((shape) => (
                 <button
@@ -541,8 +635,9 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
               onChange={(outline) => a.setPrefs({ outline })}
             />
             <p className="b-fine">
-              Right-click me to hide me, and right-click the same spot to bring me back. <kbd>Alt</kbd> <kbd>L</kbd>{' '}
-              does both. Hidden or not, I still check each prompt when you press Send.
+              Right-click me for the branch map, today so far, or to hide me. Right-click the same spot to bring me
+              back, or press <kbd>Alt</kbd> <kbd>L</kbd>. Whatever I'm called and wherever I am, I still check each
+              prompt when you press Send.
             </p>
             <div className="b-detail">
               <p className="b-rule">Set by {manager.name}'s team</p>
@@ -752,7 +847,7 @@ export function Bubble({ scene, placement, counters, prefs, hasDraft, actions, b
       data-placement={placement}
       data-compact={view.compact ? '' : undefined}
       role="dialog"
-      aria-label="Layers"
+      aria-label={prefs.name}
       tabIndex={-1}
       onKeyDown={onKeyDown}
     >
