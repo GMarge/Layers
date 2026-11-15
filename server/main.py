@@ -893,19 +893,19 @@ def _shape(lines: list[tuple], nodes: list[tuple], active: str, stops: tuple = (
 # connected to anything: the page marks them "Sample", and only the signed-in employee is live.
 SAMPLE_TEAM = [
     {
-        "id": "marcus", "name": "Marcus Bell", "role": "Analyst", "team": "Strategy", "sample": True,
+        "id": "dwight", "name": "Dwight Schrute", "role": "Assistant to the Manager", "team": "Strategy", "sample": True,
         "project": {"name": "Project Y", "title": "Customer interview synthesis", "due": "Wed, Nov 25"},
         "tasks": [
             {"id": "y1", "title": "Collect interview notes", "status": "done"},
             {"id": "y2", "title": "Tag themes", "status": "done"},
             {"id": "y3", "title": "Draft the synthesis", "status": "doing"},
-            {"id": "y4", "title": "Review with Priya", "status": "todo"},
+            {"id": "y4", "title": "Review with Michael", "status": "todo"},
         ],
         "counts": {"checked": 14, "passed": 12, "held": 1, "reused": 1},
         "pending": 0,
         "feed": [
-            {"text": "Layers moved a direction Marcus kept returning to into its own chat."},
-            {"text": "Marcus reused a team workflow. A synthesis sheet was added to Project Y."},
+            {"text": "Layers moved a direction Dwight kept returning to into its own chat."},
+            {"text": "Dwight reused a team workflow. A synthesis sheet was added to Project Y."},
             {"text": "Layers held a prompt under rule AI-01."},
         ],
         "branches": _shape(
@@ -917,7 +917,7 @@ SAMPLE_TEAM = [
             "l2", (("main", 3, "held"),)),
     },
     {
-        "id": "ines", "name": "Ines Okafor", "role": "Associate", "team": "Strategy", "sample": True,
+        "id": "pam", "name": "Pam Beesly", "role": "Office Administrator", "team": "Strategy", "sample": True,
         "project": {"name": "Project Z", "title": "Pricing page teardown", "due": "Mon, Nov 23"},
         "tasks": [
             {"id": "z1", "title": "Capture competitor pricing pages", "status": "done"},

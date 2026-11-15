@@ -77,7 +77,7 @@ def run() -> None:
     check("evidence both ways is not guessed at",
           verdict("Compare competitor pricing for my ski trip")["kind"] == "unsure")
     check("a vague prompt is not guessed at",
-          verdict("Draft an email to Priya with my status update")["kind"] == "unsure")
+          verdict("Draft an email to Michael with my status update")["kind"] == "unsure")
     mixed = verdict("Summarize Stocksmith pricing and plan my ski weekend")
     check("a mixed prompt is offered with only its project part",
           mixed["kind"] == "unsure" and mixed.get("trimmed") == "Summarize Stocksmith pricing", mixed)
@@ -137,11 +137,11 @@ def run() -> None:
     # The layer between workers, and the branch map as the agent's index.
     ways = main.manager()["processes"]
     check("how the team works leaves out other teams",
-          len(ways) >= 4 and not any(w["who"] == "Dana Ortiz" for w in ways), [w["who"] for w in ways])
+          len(ways) >= 4 and not any(w["who"] == "Milton Waddams" for w in ways), [w["who"] for w in ways])
     check("applying a workflow adds the employee's own steps to it",
           any(w["who"] == db.EMPLOYEE["name"] and not w["sample"] for w in ways))
     check("an offered workflow says who already used it",
-          any(u["who"] == "Ines Okafor" for u in verdict(SHEET)["item"]["usedBy"]))
+          any(u["who"] == "Pam Beesly" for u in verdict(SHEET)["item"]["usedBy"]))
     said = main.ask(main.AskIn(prompt="How have teammates done a comparison like this?"))
     check("asking how teammates did it gives their steps", said.get("processes") and said["processes"][0]["path"], said)
     said = main.ask(main.AskIn.model_validate({"prompt": "Where did I ask about pricing?", "branches": [
@@ -158,9 +158,9 @@ def run() -> None:
     check("a question about how others did it is treated as work", verdict(asked)["kind"] == "pass")
     told = main.chat(main.ChatIn(prompt=asked))
     check("the chat answers it from the company's records, with no model",
-          told["placeholder"] is False and "Ines Okafor" in told["text"] and told["knowledge"]["processes"], told)
+          told["placeholder"] is False and "Pam Beesly" in told["text"] and told["knowledge"]["processes"], told)
     check("another team's work is named as existing, and nothing more",
-          told["knowledge"]["restricted"] == ["Finance"] and "Dana" not in json.dumps(told) and "board deck" not in told["text"].lower(), told)
+          told["knowledge"]["restricted"] == ["Finance"] and "Milton" not in json.dumps(told) and "board deck" not in told["text"].lower(), told)
 
     # The agent's second job, on plain code here: an update that waits for the employee.
     draft = last(main.draft_update(), "draft")

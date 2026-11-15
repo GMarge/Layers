@@ -12,7 +12,7 @@ DB_PATH = Path(__file__).resolve().parent.parent / "layers.db"
 # and is never taken from the browser or from the model.
 EMPLOYEE = {"name": "Gavin Margerum", "team": "Strategy", "role": "Intern"}
 COMPANY = "The Company Company"
-MANAGER = "Priya Nair"
+MANAGER = "Michael Scott"
 PROJECT = {"name": "Project X", "title": "Competitor analysis", "due": "Fri, Nov 20"}
 
 COMPETITORS = ["Stocksmith", "Pantryline", "Crateworks", "Tallyhouse", "Larder & Co"]
@@ -113,14 +113,14 @@ def reset() -> None:
         _conn.executemany("INSERT INTO workflows VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", [
             ("wf-competitor-matrix-v2", "CompetitorMatrix_v2", "Approved workflow",
              "Comparison sheet with scoring columns for up to ten competitors.",
-             "Marcus Bell", "Strategy", "Oct 28, 2026", MANAGER,
+             "Dwight Schrute", "Strategy", "Oct 28, 2026", MANAGER,
              "Shared with Strategy, interns included",
              json.dumps(["Company", "Segment", "Pricing model", "Standout feature", "Gap we can use"]),
              "A list of competitor names", json.dumps(["Strategy"]),
              json.dumps({"task": "t3", "title": "competitor matrix", "noun": "Comparison sheet", "rows": None})),
             ("wf-readout-outline-v3", "ReadoutOutline_v3", "Approved workflow",
              "Presentation outline for a project readout, with the key point, evidence and owner of each section.",
-             "Elena Ruiz", "Strategy", "Nov 3, 2026", MANAGER,
+             "Peter Gibbons", "Strategy", "Nov 3, 2026", MANAGER,
              "Shared with Strategy, interns included",
              json.dumps(["Section", "Key point", "Evidence to show", "Owner"]),
              "The project's findings", json.dumps(["Strategy"]),
@@ -129,13 +129,13 @@ def reset() -> None:
                                   "Recommendation"]})),
             ("wf-board-deck-q3", "BoardDeck_Q3", "Approved workflow",
              "Quarterly board deck outline with finance tables.",
-             "Dana Ortiz", "Finance", "Sep 12, 2026", "Dana Ortiz",
+             "Milton Waddams", "Finance", "Sep 12, 2026", "Bill Lumbergh",
              "Finance only", json.dumps(["Section", "Owner", "Status"]),
              "Quarterly figures", json.dumps(["Finance"]),
              json.dumps({"task": "t4", "title": "board deck", "noun": "Board deck", "rows": ["Summary"]})),
             ("wf-interview-synth", "InterviewSynthesis_v1", "Approved workflow",
              "Template for turning customer interview notes into themes.",
-             "Marcus Bell", "Strategy", "Aug 30, 2026", MANAGER,
+             "Dwight Schrute", "Strategy", "Aug 30, 2026", MANAGER,
              "Shared with Strategy, interns included",
              json.dumps(["Theme", "Quote", "Customer", "Strength"]),
              "Interview notes", json.dumps(["Strategy"]),
@@ -148,19 +148,19 @@ def reset() -> None:
         _conn.executemany(
             "INSERT INTO processes (person, team, project, workflow_id, did, path, created_at, sample) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, 1)", [
-                ("Ines Okafor", "Strategy", "Project Z", "wf-competitor-matrix-v2",
+                ("Pam Beesly", "Strategy", "Project Z", "wf-competitor-matrix-v2",
                  "Laid competitor pricing pages side by side, tier by tier",
                  json.dumps(["Pricing pages", "Plan tiers", "Comparison spreadsheet"]), time.time() - 2 * day),
-                ("Marcus Bell", "Strategy", "Project Y", "wf-interview-synth",
+                ("Dwight Schrute", "Strategy", "Project Y", "wf-interview-synth",
                  "Turned twelve customer interviews into themes, then a synthesis draft",
                  json.dumps(["Interview notes", "Theme tagging", "Synthesis draft"]), time.time() - 3 * day),
-                ("Elena Ruiz", "Strategy", "Loyalty study", "wf-readout-outline-v3",
-                 "Built the readout presentation for the loyalty study from her findings",
+                ("Peter Gibbons", "Strategy", "Loyalty study", "wf-readout-outline-v3",
+                 "Built the readout presentation for the loyalty study from the findings",
                  json.dumps(["Findings", "Presentation outline", "Readout"]), time.time() - 9 * day),
-                ("Marcus Bell", "Strategy", "Vendor renewal", "wf-competitor-matrix-v2",
+                ("Dwight Schrute", "Strategy", "Vendor renewal", "wf-competitor-matrix-v2",
                  "Compared six point-of-sale vendors side by side before a renewal",
                  json.dumps(["Vendor shortlist", "Comparison spreadsheet", "Recommendation"]), time.time() - 12 * day),
-                ("Dana Ortiz", "Finance", "Q3 close", "wf-board-deck-q3",
+                ("Milton Waddams", "Finance", "Q3 close", "wf-board-deck-q3",
                  "Assembled the quarterly board deck",
                  json.dumps(["Figures", "Board deck"]), time.time() - 20 * day),
             ])

@@ -3,8 +3,8 @@ import type { KnowledgeItem, Message, Rule, Task, TeamProcess } from '../layers/
 /** Everything in this file is fictional seed data for the demo workspace. */
 
 export const company = { name: 'The Company Company', assistant: 'The Company Company' };
-export const employee = { name: 'Gavin Margerum', initials: 'GM', role: 'Intern, Strategy' };
-export const manager = { name: 'Priya Nair', first: 'Priya' };
+export const employee = { name: 'Gavin Margerum', initials: 'GM', role: 'Intern' };
+export const manager = { name: 'Michael Scott', first: 'Michael' };
 
 export const project = {
   name: 'Project X',
@@ -51,7 +51,7 @@ export const competitorMatrix: KnowledgeItem = {
   name: 'CompetitorMatrix_v2',
   kind: 'Approved workflow',
   summary: 'Comparison sheet with scoring columns for up to ten competitors.',
-  author: 'Marcus Bell',
+  author: 'Dwight Schrute',
   team: 'Strategy',
   reviewedOn: 'Oct 28, 2026',
   approvedBy: manager.name,
@@ -59,15 +59,15 @@ export const competitorMatrix: KnowledgeItem = {
   columns: ['Company', 'Segment', 'Pricing model', 'Standout feature', 'Gap we can use'],
   inputs: 'A list of competitor names',
   usedBy: [
-    { who: 'Ines Okafor', project: 'Project Z' },
-    { who: 'Marcus Bell', project: 'Vendor renewal' },
+    { who: 'Pam Beesly', project: 'Project Z' },
+    { who: 'Dwight Schrute', project: 'Vendor renewal' },
   ],
 };
 
 /** How teammates did similar work. The same sample records the server holds. */
 export const teamProcesses: TeamProcess[] = [
   {
-    who: 'Ines Okafor',
+    who: 'Pam Beesly',
     project: 'Project Z',
     did: 'Laid competitor pricing pages side by side, tier by tier',
     path: ['Pricing pages', 'Plan tiers', 'Comparison spreadsheet'],
@@ -76,7 +76,7 @@ export const teamProcesses: TeamProcess[] = [
     sample: true,
   },
   {
-    who: 'Marcus Bell',
+    who: 'Dwight Schrute',
     project: 'Project Y',
     did: 'Turned twelve customer interviews into themes, then a synthesis draft',
     path: ['Interview notes', 'Theme tagging', 'Synthesis draft'],
@@ -85,9 +85,9 @@ export const teamProcesses: TeamProcess[] = [
     sample: true,
   },
   {
-    who: 'Elena Ruiz',
+    who: 'Peter Gibbons',
     project: 'Loyalty study',
-    did: 'Built the readout presentation for the loyalty study from her findings',
+    did: 'Built the readout presentation for the loyalty study from the findings',
     path: ['Findings', 'Presentation outline', 'Readout'],
     workflow: 'ReadoutOutline_v3',
     when: '9 days ago',
@@ -100,14 +100,14 @@ export const readoutOutline: KnowledgeItem = {
   name: 'ReadoutOutline_v3',
   kind: 'Approved workflow',
   summary: 'Presentation outline for a project readout, with the key point, evidence and owner of each section.',
-  author: 'Elena Ruiz',
+  author: 'Peter Gibbons',
   team: 'Strategy',
   reviewedOn: 'Nov 3, 2026',
   approvedBy: manager.name,
   access: 'Shared with Strategy, interns included',
   columns: ['Section', 'Key point', 'Evidence to show', 'Owner'],
   inputs: "The project's findings",
-  usedBy: [{ who: 'Elena Ruiz', project: 'Loyalty study' }],
+  usedBy: [{ who: 'Peter Gibbons', project: 'Loyalty study' }],
 };
 
 export const outlineSections = ['Why this matters', 'Who we compared', 'What we found', 'Gaps we can use', 'Recommendation'];
@@ -131,7 +131,7 @@ export const seedMessages: Message[] = [
 export const examplePrompts = {
   offTopic: 'Plan my ski vacation this weekend',
   rebuild: 'Build me an Excel automation that compares our five competitors',
-  unsure: 'Draft an email to Priya with my status update',
+  unsure: 'Draft an email to Michael with my status update',
   outline: 'Create a presentation outline for the Project X readout',
   onTopic: 'Summarize how Stocksmith and Pantryline price their plans',
 };

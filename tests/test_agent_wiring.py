@@ -45,7 +45,7 @@ def main():
         call("get_project_context"),
         call("check_company_policy", prompt="Build me an Excel automation that compares our five competitors"),
         call("search_org_memory", query="competitor comparison spreadsheet"),
-        call("submit_verdict", kind="reuse", reason="Marcus already built this.",
+        call("submit_verdict", kind="reuse", reason="Dwight already built this.",
              workflow_id="wf-competitor-matrix-v2"),
         AIMessage(content="Your team already has this."),
     ])

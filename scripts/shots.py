@@ -109,8 +109,19 @@ async def session(ws) -> None:
 
     await shot("01-workspace")
 
+    await js("""await L.send('Which five competitors should the Project X analysis cover? One line on each.');
+                await L.until(() => L.title().includes('asked this before'), 'the repeat', 20000);""")
+    await shot("18-you-asked-this-before")
+    await js("await L.click('.bubble', 'Go to it'); await L.sleep(900);")
+
     await js("""const n = L.answers(); await L.send('Summarize how Stocksmith and Pantryline price their plans');
                 await L.until(() => L.answers() > n, 'the first answer');""")
+
+    await js("""const n = L.answers();
+                await L.send('How did someone on the other team do something similar, and what did they use?');
+                await L.until(() => L.answers() > n && document.querySelector('.know'), 'the answer from company records');
+                document.querySelector('.know').scrollIntoView({ block: 'center' });""")
+    await shot("19-answers-from-company-records")
 
     await js("""document.querySelector('.views__try').click(); await L.sleep(250);
                 await L.click('.views__menu', 'Ask Layers');
@@ -127,7 +138,7 @@ async def session(ws) -> None:
                 await L.click('.bubble', 'Why was this held');""")
     await shot("02-held-with-the-reason")
 
-    await js("""await L.click('.bubble', 'Ask Priya');
+    await js("""await L.click('.bubble', 'Ask Michael');
                 await L.until(() => document.querySelector('.composer__hold')?.textContent.includes('Waiting'), 'the request');
                 location.hash = '#manager';
                 await L.until(() => document.querySelector('.mgr__req'), 'the manager page');""")
@@ -137,7 +148,7 @@ async def session(ws) -> None:
                 await L.until(() => L.title().includes('declined'), 'the decline');
                 await L.click('.bubble', 'Back to Project X'); await L.sleep(900);""")
 
-    await js("""await L.send('Draft an email to Priya with my status update');
+    await js("""await L.send('Draft an email to Michael with my status update');
                 await L.until(() => L.title().includes('not sure'), 'the unsure question');""")
     await shot("03-not-sure-asks-you")
     await js("await L.click('.bubble', 'Back to Project X'); await L.sleep(900);")
@@ -168,7 +179,7 @@ async def session(ws) -> None:
     await js("""L.tab('Today'); await L.sleep(300); await L.click('.bpanel__update', 'Draft an update');
                 await L.until(() => document.querySelector('.bpanel__draft'), 'the drafted update');""")
     await shot("08-update-waits-for-you")
-    await js("""await L.click('.bpanel__update', 'Send to Priya');
+    await js("""await L.click('.bpanel__update', 'Send to Michael');
                 await L.until(() => document.querySelector('.bpanel__sent'), 'the sent update');""")
 
     await js("L.tab('Agent'); await L.until(() => !document.querySelector('.toast'), 'the note to clear', 15000);")

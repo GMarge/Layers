@@ -129,7 +129,7 @@ export function previewKnowledge(prompt: string) {
 function answer(question: string): AskAnswer {
   if (ASKS_TEAM.test(question)) {
     return {
-      text: 'Ines and Marcus on your team have done work like this. Here is how.',
+      text: 'Pam and Dwight on your team have done work like this. Here is how.',
       processes: teamProcesses.slice(0, 2),
       item: competitorMatrix,
     };
