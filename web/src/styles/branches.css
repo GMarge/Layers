@@ -1133,10 +1133,17 @@ button.bmap__dot:hover::after,
   outline-offset: 1px;
 }
 
-/* A narrower window, or half of the side-by-side view: keep room for the chat's name. */
-@media (max-width: 1040px) {
+/* A narrower window, or half of the side-by-side view: keep the top bar's buttons clear of the
+   demo bar in the middle, and keep room for the chat's name. */
+@media (max-width: 1420px) {
   .topbar__branches span,
   .proj__title {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .proj__count {
     display: none;
   }
 }

@@ -807,9 +807,18 @@
   color: #a4a4b0;
 }
 
-@media (max-width: 560px) {
-  .views a[data-view='both'],
+@media (max-width: 1180px) {
   .views__refresh span {
+    display: none;
+  }
+
+  .views__refresh {
+    padding: 5px 8px;
+  }
+}
+
+@media (max-width: 560px) {
+  .views a[data-view='both'] {
     display: none;
   }
 
