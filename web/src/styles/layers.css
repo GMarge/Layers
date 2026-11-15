@@ -461,10 +461,10 @@
 @keyframes bob {
   0%,
   100% {
-    transform: translateY(1.5px);
+    transform: translateY(0);
   }
   50% {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
   }
 }
 
@@ -1277,7 +1277,8 @@ li[data-status='done'] .steps__mark {
   transform: rotate(-3deg);
   transform-origin: 50% 100%;
   opacity: 0;
-  transition: opacity 200ms;
+  /* No fade: it must vanish the instant its animation ends, or it flashes at full size. */
+  transition: none;
 }
 
 .mascot[data-phase='in'] .goo__pool {

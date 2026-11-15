@@ -62,7 +62,8 @@ function dockPoint(): Point {
 function composerPoint(): Point {
   const r = composerRect();
   if (!r) return dockPoint();
-  return { x: Math.round(r.left + 40), y: Math.round(r.top - HALF - GAP) };
+  // Far enough in that the swell clears the box's rounded corner.
+  return { x: Math.round(r.left + 68), y: Math.round(r.top - HALF - GAP) };
 }
 
 /** Resting in the chat box and speaking from it are the same spot: only the liquid moves. */
