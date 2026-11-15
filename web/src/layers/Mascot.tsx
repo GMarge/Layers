@@ -11,10 +11,18 @@ type Phase = Presence | 'sinking' | 'rising' | 'plucked';
 
 /**
  * Silhouettes on a 64 x 64 grid. To change the character, edit or add an entry:
- * `d` is the body, `eyeY` is where the eyes sit, `fold` is an optional darker detail.
+ * `d` is the body, `eyeY` is where the eyes sit, `fold` is an optional darker detail,
+ * and `under` is the shape of the layers behind it when that differs from the body.
  */
-export const SHAPES: Record<Shape, { name: string; d: string; eyeY: number; fold?: string }> = {
-  drop: { name: 'Drop', d: 'M32 5C36 13 56 25 56 38A24 24 0 0 1 8 38C8 25 28 13 32 5Z', eyeY: 39 },
+export const SHAPES: Record<Shape, { name: string; d: string; eyeY: number; fold?: string; under?: string }> = {
+  drop: {
+    name: 'Drop',
+    d: 'M32 5C36 13 56 25 56 38A24 24 0 0 1 8 38C8 25 28 13 32 5Z',
+    eyeY: 39,
+    // The layers behind a drop are a circle that fits wholly inside it. With no point of
+    // their own, and no part wider than his shoulders, nothing coloured can poke out up top.
+    under: 'M9.5 39a22.5 22.5 0 1 0 45 0a22.5 22.5 0 1 0-45 0Z',
+  },
   ghost: {
     name: 'Ghost',
     d: 'M10 30A22 22 0 0 1 54 30V54q-5.5 6-11 0q-5.5 6-11 0q-5.5 6-11 0q-5.5 6-11 0Z',
@@ -71,6 +79,8 @@ interface Props {
   presence: Presence;
   /** True while the droplet is forming out of the chat box. Driven by the cluster so both stay in step. */
   rising: boolean;
+  /** Play the pop-out fast (he was dragged out, not tapped). */
+  quick: boolean;
   reducedMotion: boolean;
   grabbed: boolean;
   /** Being held over the chat box, where letting go tucks it in. */
@@ -247,6 +257,7 @@ export function Mascot(props: Props) {
       data-phase={shown}
       data-grab={grabbed ? '' : undefined}
       data-over={props.over ? '' : undefined}
+      data-quick={props.quick && props.rising ? '' : undefined}
       style={{ '--eye-lift': `${s.eyeY - NIB_EYE_Y}px` } as CSSProperties}
       aria-label={label}
       aria-hidden={shown === 'gone' ? true : undefined}
@@ -285,7 +296,7 @@ export function Mascot(props: Props) {
                   <path
                     key={fill}
                     className="mascot__layer"
-                    d={s.d}
+                    d={s.under ?? s.d}
                     fill={fill}
                     style={{ '--i': UNDER.length - n } as CSSProperties}
                   />

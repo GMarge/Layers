@@ -271,10 +271,6 @@
   transition: transform var(--t-med) var(--ease-out);
 }
 
-.mascot[data-grab] .mascot__svg {
-  transform: scale(1.06);
-}
-
 .mascot__body {
   fill: var(--agent);
 }
@@ -285,8 +281,10 @@
 
 .mascot__layer {
   transform-box: view-box;
-  transform-origin: 50% 8%;
-  transform: rotate(calc(var(--fan) * var(--i) * 5.5deg));
+  transform-origin: 50% 59%;
+  /* Offset down and to the left, like the sheets in the logo. The slight shrink keeps
+     them fully hidden behind him when they are tucked in. */
+  transform: translate(calc(var(--fan) * var(--i) * -3.4px), calc(var(--fan) * var(--i) * 3.4px)) scale(0.97);
   transition: transform 460ms var(--ease-out);
 }
 
@@ -456,10 +454,10 @@
 @keyframes shuffle {
   0%,
   100% {
-    transform: rotate(calc(var(--i) * 2deg));
+    transform: translate(calc(var(--i) * -1.1px), calc(var(--i) * 1.1px)) scale(0.97);
   }
   50% {
-    transform: rotate(calc(var(--i) * 6.5deg));
+    transform: translate(calc(var(--i) * -3.6px), calc(var(--i) * 3.6px)) scale(0.97);
   }
 }
 
@@ -1332,21 +1330,35 @@ li[data-status='done'] .steps__mark {
 .nib-eyes {
   position: absolute;
   left: 0;
-  top: 68px;
+  top: 64.5px;
   display: flex;
+  align-items: center;
   justify-content: center;
   gap: 7px;
   width: 100%;
+  height: 14px;
   opacity: 0;
   pointer-events: none;
 }
 
+/* Each small eye is his real eye at five eighths size. Growing by 1.6 wide and 1.714 tall
+   lands on the real size exactly; --spread is how far each must move sideways to land on
+   the real position too. */
 .nib-eyes i {
-  width: 5px;
-  height: 7px;
+  --spread: calc(3.5px - var(--eye-rx, 4px) * 0.625);
+  width: calc(var(--eye-rx, 4px) * 1.25);
+  height: calc(var(--eye-ry, 6px) * 1.1667);
   border-radius: 50%;
   background: var(--eye);
   animation: nib-blink 5.6s infinite;
+}
+
+.nib-eyes i:first-child {
+  --dir: -1;
+}
+
+.nib-eyes i:last-child {
+  --dir: 1;
 }
 
 .mascot[data-phase='in'] .nib-eyes {
@@ -1375,15 +1387,25 @@ li[data-status='done'] .steps__mark {
 /* Forming */
 .mascot[data-phase='rising'] :is(.goo__blob, .crisp__blob) {
   opacity: 1;
-  animation: flow-up 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: flow-up calc(900ms * var(--k, 1)) cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .mascot[data-phase='rising'] .goo__pool {
-  animation: pool-out 480ms cubic-bezier(0.4, 0, 0.6, 1) 170ms both;
+  animation: pool-out calc(480ms * var(--k, 1)) cubic-bezier(0.4, 0, 0.6, 1) calc(170ms * var(--k, 1)) both;
 }
 
 .mascot[data-phase='rising'] .nib-eyes {
-  animation: eyes-up 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  opacity: 1;
+  animation: eyes-up calc(900ms * var(--k, 1)) cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.mascot[data-phase='rising'] .nib-eyes i {
+  animation: eye-grow calc(900ms * var(--k, 1)) cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Dragged out instead of tapped: the same pop-out, played faster. */
+.mascot[data-quick] {
+  --k: 0.5;
 }
 
 .mascot[data-phase='rising'] .mascot__melt {
@@ -1401,7 +1423,12 @@ li[data-status='done'] .steps__mark {
 }
 
 .mascot[data-phase='sinking'] .nib-eyes {
+  opacity: 1;
   animation: eyes-down 800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.mascot[data-phase='sinking'] .nib-eyes i {
+  animation: eye-shrink 800ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .mascot[data-phase='sinking'] .mascot__melt {
@@ -1444,32 +1471,49 @@ li[data-status='done'] .steps__mark {
   }
 }
 
-/* The eyes wait in the swell until the liquid has risen under them, then travel with it,
-   growing to exactly the size of his real eyes. */
+/* The eyes wait in the swell until the liquid has risen under them, then travel with it.
+   The pair moves up as one; each eye grows and spreads to exactly where his real eyes are. */
 @keyframes eyes-up {
   0%,
   14% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
   100% {
-    opacity: 1;
-    transform: translateY(var(--eye-lift)) scale(1.6, 1.7);
+    transform: translateY(var(--eye-lift));
+  }
+}
+
+@keyframes eye-grow {
+  0%,
+  14% {
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    transform: translateX(calc(var(--dir) * var(--spread))) scale(1.6, 1.7143);
   }
 }
 
 @keyframes eyes-down {
   0% {
-    opacity: 1;
-    transform: translateY(var(--eye-lift)) scale(1.6, 1.7);
+    transform: translateY(var(--eye-lift));
   }
   62% {
-    opacity: 1;
-    transform: translateY(calc(var(--eye-lift) * 0.14)) scale(1.08);
+    transform: translateY(calc(var(--eye-lift) * 0.14));
   }
   100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
+  }
+}
+
+@keyframes eye-shrink {
+  0% {
+    transform: translateX(calc(var(--dir) * var(--spread))) scale(1.6, 1.7143);
+  }
+  62% {
+    transform: translateX(calc(var(--dir) * var(--spread) * 0.14)) scale(1.08, 1.1);
+  }
+  100% {
+    transform: translateX(0) scale(1);
   }
 }
 

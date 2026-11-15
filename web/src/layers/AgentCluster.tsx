@@ -9,7 +9,9 @@ const HALF = 32; // half the mascot's size
 const DOCK = 58; // distance from the corner to the mascot's centre when floating with no chosen spot
 const GAP = 14; // space between the mascot and the composer it speaks from
 const HOME_KEY = 'layers.home';
-const EMERGE_MS = 900; // how long the droplet takes to form before the agent lifts off
+const EMERGE_MS = 900;
+const QUICK = 0.5; // a drag-off plays the pop-out at this fraction of its normal length
+const EMERGE_QUICK_MS = EMERGE_MS * QUICK; // how long the droplet takes to form before the agent lifts off
 
 /**
  * Where the agent is headed:
@@ -129,29 +131,72 @@ export function AgentCluster(props: Props) {
           : 'home';
   const place: BubblePlacement = narrow ? 'above' : placement;
 
-  // Coming out of the chat box, the bubble waits until the droplet has fully formed.
-  // Only rising out of the box counts. Coming back from hidden is a different, in-place return.
+  // Leaving the chat box always plays the same pop-out, whether he was tapped or dragged.
+  // He forms at the box first, and only then goes where he is headed. Hiding is not
+  // leaving: that is a fade in place.
   const inBox = anchor === 'absorbed';
   const wasInBox = useRef(inBox);
   const [emerging, setEmerging] = useState(false);
+  /** A drag-off plays the pop-out faster, so he reaches the pointer sooner. */
+  const [quick, setQuick] = useState(false);
+  const emergeTimer = useRef(0);
+  /** Where he finished forming, when he then has to catch up with the pointer. */
+  const flight = useRef<{ from: Point; at: number } | null>(null);
+  const anchorRef = useRef(anchor);
+  anchorRef.current = anchor;
   useLayoutEffect(() => {
-    const leaving = wasInBox.current && !inBox && anchor !== 'drag';
+    const leaving = wasInBox.current && !inBox;
     wasInBox.current = inBox;
-    if (!leaving || reducedMotion) return;
-    setEmerging(true);
-    const timer = setTimeout(() => setEmerging(false), EMERGE_MS);
-    return () => {
-      clearTimeout(timer);
+    if (inBox) {
+      // Back in the box before he finished forming: stop.
+      clearTimeout(emergeTimer.current);
       setEmerging(false);
-    };
-  }, [inBox, anchor, reducedMotion]);
+      return;
+    }
+    if (!leaving || reducedMotion || anchor === 'hidden') return;
+    const fast = anchor === 'drag';
+    setQuick(fast);
+    setEmerging(true);
+    clearTimeout(emergeTimer.current);
+    emergeTimer.current = window.setTimeout(
+      () => {
+        if (anchorRef.current === 'drag') flight.current = { from: absorbedPoint(), at: performance.now() };
+        setEmerging(false);
+      },
+      fast ? EMERGE_QUICK_MS : EMERGE_MS,
+    );
+    // Keyed on leaving the box only. Where he goes afterwards must not restart or cut it short.
+  }, [inBox]);
+  useEffect(() => () => clearTimeout(emergeTimer.current), []);
 
   // Start at the intended anchor, rather than flashing at the bottom-right dock.
   const [target, setTarget] = useState<Point>(() => {
     if (anchor === 'composer' || anchor === 'absorbed') return composerPoint();
     return home ? clampToView(home) : dockPoint();
   });
-  const arrived = useSpringPosition(clusterRef, target, reducedMotion || anchor === 'drag');
+  // A drag follows the pointer exactly, except while he is still forming at the box.
+  const arrived = useSpringPosition(clusterRef, target, reducedMotion || (anchor === 'drag' && !emerging));
+
+  // He formed at the box while the pointer moved on. Now that he follows the pointer,
+  // fly him over from where he formed, so he catches up in one move instead of jumping.
+  useLayoutEffect(() => {
+    const f = flight.current;
+    if (!f || emerging) return;
+    if (anchor !== 'drag' || performance.now() - f.at > 160) {
+      flight.current = null;
+      return;
+    }
+    const dx = f.from.x - target.x;
+    const dy = f.from.y - target.y;
+    if (Math.hypot(dx, dy) < 4) return; // the target has not moved to the pointer yet
+    flight.current = null;
+    clusterRef.current
+      ?.querySelector<HTMLElement>('.mascot')
+      ?.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }], {
+        duration: 300,
+        easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      });
+  }, [target.x, target.y, emerging, anchor]);
 
   // The spring's 'arrived' signal is intentionally generous. Do not pop the
   // speech bubble before the mascot visually reaches the final few pixels.
@@ -185,14 +230,17 @@ export function AgentCluster(props: Props) {
   useLayoutEffect(() => {
     const compute = () => {
       const bubbleHeight = bubbleRef.current?.offsetHeight ?? 0;
-      let next: Point;
-      if (anchor === 'drag' && drag) next = drag;
-      else if (anchor === 'composer') next = composerPoint();
-      else if (anchor === 'hidden') {
+      if (anchor === 'hidden') {
         // Hidden: stay exactly where he was. He fades out in place and comes back in place.
         onReserve.current(0);
         return;
-      } else if (anchor === 'absorbed') next = absorbedPoint();
+      }
+      let next: Point;
+      // While he forms he stays at the box, wherever he is headed next.
+      if (emerging) next = absorbedPoint();
+      else if (anchor === 'drag' && drag) next = drag;
+      else if (anchor === 'composer') next = composerPoint();
+      else if (anchor === 'absorbed') next = absorbedPoint();
       else next = home ? clampToView(home) : dockPoint();
       setTarget((prev) => (prev.x === next.x && prev.y === next.y ? prev : next));
 
@@ -258,14 +306,19 @@ export function AgentCluster(props: Props) {
         followPointer={!speaking && !drag}
         presence={presence}
         rising={emerging}
+        quick={quick}
         reducedMotion={reducedMotion}
         grabbed={!!drag}
         over={over}
-        draggable={!speaking && !emerging && presence !== 'gone'}
-        label={speaking ? 'Layers' : 'Layers. Ask a question, or drag to move.'}
+        draggable={!emerging && presence !== 'gone' && scene.name !== 'working' && scene.name !== 'checking'}
+        label={speaking ? 'Layers. Drag to move.' : 'Layers. Ask a question, or drag to move.'}
         onClick={props.onMascotClick}
         onHide={props.actions.toggleHidden}
-        onDrag={(centre) => setDrag(clampToView(centre))}
+        onDrag={(centre) => {
+          // Picking him up while he is talking puts the bubble away. A tap brings it back.
+          if (!drag && speaking) props.actions.dismiss();
+          setDrag(clampToView(centre));
+        }}
         onDrop={onDrop}
       />
       {arrived && bubbleReady && !emerging && anchor === 'composer' && (
