@@ -10,15 +10,52 @@ import App from './App';
 import { ManagerView } from './manager/ManagerView';
 import './styles/manager.css';
 
-/** The manager's page lives at #manager. Everything else is the employee's workspace. */
+type View = 'employee' | 'manager' | 'both';
+
+const viewOf = (hash: string): View => (hash === '#manager' ? 'manager' : hash === '#both' ? 'both' : 'employee');
+const embedded = window.self !== window.top;
+
+const VIEWS: [View, string, string][] = [
+  ['employee', '#', 'Employee'],
+  ['manager', '#manager', 'Manager'],
+  ['both', '#both', 'Side by side'],
+];
+
+/**
+ * One address, three views. The employee's workspace stays mounted while the manager's
+ * view is showing, so a request sent for approval is still there when you hop back.
+ */
 function Root() {
-  const [hash, setHash] = useState(window.location.hash);
+  const [view, setView] = useState<View>(viewOf(window.location.hash));
   useEffect(() => {
-    const onChange = () => setHash(window.location.hash);
+    const onChange = () => setView(viewOf(window.location.hash));
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
-  return hash === '#manager' ? <ManagerView /> : <App />;
+
+  return (
+    <>
+      <div style={{ display: view === 'employee' ? 'contents' : 'none' }}>
+        <App />
+      </div>
+      {view === 'manager' && <ManagerView />}
+      {view === 'both' && (
+        <div className="split">
+          <iframe title="Employee workspace" src="/" />
+          <iframe title="Manager view" src="/#manager" />
+        </div>
+      )}
+      {!embedded && (
+        <nav className="views" data-view={view} aria-label="Demo view">
+          {VIEWS.map(([name, href, label]) => (
+            <a key={name} href={href} aria-current={view === name ? 'page' : undefined}>
+              {label}
+            </a>
+          ))}
+        </nav>
+      )}
+    </>
+  );
 }
 
 createRoot(document.getElementById('root')!).render(

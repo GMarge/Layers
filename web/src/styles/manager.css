@@ -232,3 +232,64 @@
     gap: 28px;
   }
 }
+
+/* Demo control: hop between the employee and the manager, or see both. */
+
+.views {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 80;
+  display: flex;
+  padding: 3px;
+  border-radius: 12px;
+  background: #17171c;
+  box-shadow: var(--shadow-pop);
+  transform: translateX(-50%);
+}
+
+.views a {
+  padding: 5px 12px;
+  border-radius: 9px;
+  color: #c9c9d4;
+  font-size: 12.5px;
+  font-weight: 560;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.views a:hover {
+  color: #ffffff;
+}
+
+.views a[aria-current] {
+  background: #f1f1f4;
+  color: #131316;
+}
+
+.views a:focus-visible {
+  outline: 2px solid #f1f1f4;
+  outline-offset: 1px;
+}
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 1px;
+  height: 100dvh;
+  background: var(--line-strong);
+}
+
+.split iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: var(--surface);
+}
+
+/* In the split view the switcher sits at the bottom of the seam, clear of both pages. */
+.views[data-view='both'] {
+  top: auto;
+  bottom: 12px;
+  left: 60%;
+}
