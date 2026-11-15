@@ -45,6 +45,17 @@ class PromptIn(BaseModel):
     prompt: str = Prompt
 
 
+class Turn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=6000)
+
+
+class ChatIn(BaseModel):
+    prompt: str = Prompt
+    # What this branch of the conversation has seen so far, oldest first.
+    context: list[Turn] | None = Field(default=None, max_length=24)
+
+
 class ApplyIn(BaseModel):
     workflow_id: str = Field(min_length=1, max_length=80)
     prompt: str = Prompt
@@ -373,7 +384,7 @@ def feedback(body: FeedbackIn):
 
 
 @app.post("/api/chat")
-def chat(body: PromptIn):
+def chat(body: ChatIn):
     """The workspace model. A prompt only gets here with an allowing decision on record."""
     prompt = body.prompt.strip()
     if not policy.may_send(prompt):
@@ -387,7 +398,9 @@ def chat(body: PromptIn):
 
         agent.spend_run()
         CHAT.append({"role": "user", "content": prompt})
-        reply = init_chat_model(agent.MODEL).invoke([{"role": "system", "content": WORKSPACE_PROMPT}, *CHAT[-24:]])
+        seen = [t.model_dump() for t in body.context] if body.context is not None else CHAT[-24:-1]
+        reply = init_chat_model(agent.MODEL).invoke(
+            [{"role": "system", "content": WORKSPACE_PROMPT}, *seen, {"role": "user", "content": prompt}])
         text = reply.content
         if isinstance(text, list):  # some providers answer in content blocks
             text = "".join(part.get("text", "") for part in text if isinstance(part, dict))

@@ -77,9 +77,9 @@ const service: LayersService = {
     await post('feedback', { kind, prompt, note: note ?? '' });
   },
 
-  async reply(prompt) {
+  async reply(prompt, context) {
     try {
-      return await post<{ text: string; placeholder: boolean }>('chat', { prompt });
+      return await post<{ text: string; placeholder: boolean }>('chat', { prompt, context });
     } catch {
       return { text: 'Layers did not clear this prompt, so it was not sent to the workspace model.', placeholder: true };
     }

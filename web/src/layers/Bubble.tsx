@@ -38,6 +38,10 @@ export interface BubbleActions {
   /** Send a prompt Layers was unsure about, with the employee's reason attached. */
   sendWithNote(note: string): void;
   openSettings(): void;
+  /** Fold a direction Layers split off back into the main line. */
+  mergeBranch(lineId: string): void;
+  /** Make a direction Layers split off into a chat of its own. */
+  detachBranch(lineId: string): void;
   setPrefs(change: Partial<Pick<Prefs, 'shape' | 'eyes' | 'rest' | 'outline'>>): void;
   /** Hide the agent completely, or bring it back. */
   toggleHidden(): void;
@@ -438,6 +442,34 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
               <SignalList signals={scene.signals} />
             </div>
             <UnsureForm a={a} />
+          </>
+        ),
+      };
+
+    case 'branch':
+      return {
+        dismissible: true,
+        shortcuts: { k: a.dismiss, m: () => a.mergeBranch(scene.lineId) },
+        takeFocus: true,
+        node: (
+          <>
+            <div className="b-main">
+              <h2 className="b-title">This is a new direction: {scene.label}.</h2>
+              <p className="b-text">
+                I put it on its own branch so the earlier thread stays intact. You can see it on the map above.
+              </p>
+              <button type="button" className="b-link" onClick={() => a.detachBranch(scene.lineId)}>
+                Make it a separate chat
+              </button>
+            </div>
+            <div className="b-actions">
+              <Act primary hint="K" onClick={a.dismiss}>
+                Keep the branch
+              </Act>
+              <Act hint="M" onClick={() => a.mergeBranch(scene.lineId)}>
+                Merge it back
+              </Act>
+            </div>
           </>
         ),
       };

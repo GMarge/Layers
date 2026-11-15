@@ -13,6 +13,8 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 - **Already built:** if the team has an approved workflow for the request, Layers offers it and, on a click, applies it to the project.
 - **Not sure:** Layers says so, shows what counted each way, and follows the company's choice: ask the employee, let it through and log it, or hand it to a person.
 
+- **Branches:** a map above the chat shows each prompt as a dot. When the conversation moves to a different part of the project, Layers puts it on its own branch without being asked. The employee can also branch on purpose, merge a branch back, or jump between them. Each branch only gives the model its own history.
+
 The employee can also ask Layers a question before sending anything, move it, hide it, and change how it looks.
 
 ## How it works

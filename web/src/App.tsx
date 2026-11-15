@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { addPrompt, branchFrom, detach, isVisible, mergeBack, seedTree, topicLabel, type Tree } from './branches/model';
+import { Rail } from './branches/Rail';
 import { DesignLab, defaultLab, type GlowLevel, type LabScene, type LabSettings } from './lab/DesignLab';
 import { AgentCluster } from './layers/AgentCluster';
 import type { BubbleActions, Prefs } from './layers/Bubble';
@@ -24,6 +26,8 @@ function glowFor(scene: Scene): GlowMode {
     case 'checking':
     case 'ask':
       return 'checking';
+    case 'branch':
+      return 'knowledge';
     case 'unsure':
       return 'unsure';
     case 'policy':
@@ -47,6 +51,8 @@ function announce(scene: Scene): string {
   switch (scene.name) {
     case 'policy':
       return `Layers held your prompt. It looks unrelated to ${project.name}. Nothing was sent.`;
+    case 'branch':
+      return `Layers noticed a new direction: ${scene.label}.`;
     case 'unsure':
       return `Layers is not sure this fits ${project.name}. Nothing was sent.`;
     case 'pending':
@@ -133,22 +139,67 @@ export default function App() {
   const reduced = systemReduced || lab.reduceMotion;
   const sidebarHidden = useMediaQuery('(max-width: 760px)');
 
-  const post = (m: Omit<Message, 'id'>) => setMessages((ms) => [...ms, { ...m, id: crypto.randomUUID() }]);
+  // The shape of the conversation: which prompts sit on which branch.
+  const [tree, setTree] = useState<Tree>(() => seedTree(seedMessages[0]!.text ?? ''));
+  const treeRef = useRef(tree);
+  treeRef.current = tree;
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
+  const seq = useRef(seedMessages.length);
+  const branchModeRef = useRef(lab.branchMode);
+  branchModeRef.current = lab.branchMode;
+
+  const changeTree = (next: Tree) => {
+    treeRef.current = next;
+    setTree(next);
+  };
+
+  const post = (m: Omit<Message, 'id'>, line?: string) => {
+    const full: Message = { ...m, id: crypto.randomUUID(), line: line ?? treeRef.current.active, seq: seq.current++ };
+    messagesRef.current = [...messagesRef.current, full];
+    setMessages((ms) => [...ms, full]);
+  };
+
+  /** Put a sent prompt on the map. Returns the line it landed on. */
+  const track = (prompt: string): string => {
+    const { tree: next, branched } = addPrompt(treeRef.current, prompt, seq.current);
+    changeTree(next);
+    if (branched) {
+      const label = topicLabel(branched.topic);
+      if (branchModeRef.current === 'auto') {
+        setTimeout(() => notify(`New direction: ${label}. Layers put it on its own branch.`), 300);
+      } else {
+        setTimeout(() => {
+          if (sceneRef.current.name === 'ambient') setScene({ name: 'branch', lineId: branched.id, label });
+        }, 700);
+      }
+    }
+    return next.active;
+  };
   const notify = (text: string) => setToast({ id: Date.now(), text });
   const focusPrompt = () => requestAnimationFrame(() => document.getElementById('prompt')?.focus());
 
   /** The prompt is cleared to go to the workspace model. */
   const forward = (prompt: string) => {
-    post({ role: 'user', text: prompt });
+    const line = track(prompt);
+    // The model is told what this branch of the conversation has seen, and nothing else.
+    const context = messagesRef.current
+      .filter((m) => m.role !== 'layers' && !m.placeholder && m.text && isVisible(treeRef.current, m))
+      .slice(-16)
+      .map((m) => ({ role: m.role === 'user' ? ('user' as const) : ('assistant' as const), content: m.text ?? '' }));
+    post({ role: 'user', text: prompt }, line);
     if (service.reply) {
       const reply = service.reply;
-      void settled.current.then(() => reply(prompt)).then((r) => post({ role: 'ai', ...r }));
+      void settled.current.then(() => reply(prompt, context)).then((r) => post({ role: 'ai', ...r }, line));
     } else {
-      post({
-        role: 'ai',
-        placeholder: true,
-        text: 'No model is connected in this preview build. Layers let this prompt through.',
-      });
+      post(
+        {
+          role: 'ai',
+          placeholder: true,
+          text: 'No model is connected in this preview build. Layers let this prompt through.',
+        },
+        line,
+      );
     }
     setDraft('');
     setHold(null);
@@ -407,7 +458,7 @@ export default function App() {
     const controller = new AbortController();
     abort.current = controller;
 
-    post({ role: 'user', text: prompt });
+    post({ role: 'user', text: prompt }, track(prompt));
     setDraft('');
     setHold(null);
     stash.current = null;
@@ -580,6 +631,16 @@ export default function App() {
     sendWithNote,
     toggleHidden,
     openSettings: () => setScene({ name: 'settings' }),
+    mergeBranch: (lineId) => {
+      changeTree(mergeBack(treeRef.current, lineId));
+      setScene({ name: 'ambient' });
+      notify('Merged back into the line it came from.');
+    },
+    detachBranch: (lineId) => {
+      changeTree(detach(treeRef.current, lineId));
+      setScene({ name: 'ambient' });
+      notify('It is now a chat of its own.');
+    },
     setPrefs: (change) => setLab((s) => ({ ...s, ...change })),
   };
 
@@ -590,6 +651,9 @@ export default function App() {
     stash.current = null;
     void service.reset?.();
     setMessages(seedMessages);
+    messagesRef.current = seedMessages;
+    seq.current = seedMessages.length;
+    changeTree(seedTree(seedMessages[0]!.text ?? ''));
     setTasks(seedTasks);
     setDraft('');
     setHold(null);
@@ -643,7 +707,7 @@ export default function App() {
     }
 
     if (name === 'working') {
-      post({ role: 'user', text: examplePrompts.rebuild });
+      post({ role: 'user', text: examplePrompts.rebuild }, track(examplePrompts.rebuild));
       setScene({ name: 'working', item: competitorMatrix, steps: previewSteps });
       return;
     }
@@ -693,7 +757,29 @@ export default function App() {
       style={{ '--glow': GLOW[lab.glow], '--reserve': `${reserve}px` } as CSSProperties}
     >
       <Workspace
-        messages={messages}
+        messages={messages.filter((m) => isVisible(tree, m))}
+        railSlot={
+          <Rail
+            tree={tree}
+            onOpen={(nodeId) => {
+              const node = tree.nodes.find((n) => n.id === nodeId);
+              if (!node) return;
+              changeTree({ ...tree, active: node.line });
+              requestAnimationFrame(() => {
+                const el = document.querySelector<HTMLElement>(`.msg--user[data-seq="${node.seq}"]`);
+                el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                el?.setAttribute('data-flash', '');
+                setTimeout(() => el?.removeAttribute('data-flash'), 1500);
+              });
+            }}
+            onBranch={(nodeId) => {
+              changeTree(branchFrom(tree, nodeId));
+              notify('New branch. Your next prompt starts from that point.');
+              focusPrompt();
+            }}
+            onMerge={(lineId) => changeTree(mergeBack(tree, lineId))}
+          />
+        }
         tasks={tasks}
         draft={draft}
         hold={hold}

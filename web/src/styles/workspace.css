@@ -185,7 +185,7 @@ kbd {
 
 .main {
   display: grid;
-  grid-template-rows: 56px minmax(0, 1fr) auto;
+  grid-template-rows: 56px auto minmax(0, 1fr) auto;
   min-width: 0;
   min-height: 0;
   background: var(--surface);
@@ -803,4 +803,16 @@ li[data-status='done'] {
 
 .msg__md-list li::marker {
   color: var(--ink-3);
+}
+
+/* A prompt the map just jumped to. */
+.msg--user[data-flash] {
+  animation: flash 1.4s var(--ease-out);
+}
+
+@keyframes flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--agent) 45%, transparent);
+  }
 }
