@@ -28,6 +28,13 @@ SEED_CHAT = [
 CHAT: list[dict] = list(SEED_CHAT)
 
 
+WORKSPACE_PROMPT = (
+    f"You are Fernhill AI, the company's work assistant. The employee is working on {db.PROJECT['name']} "
+    f"({db.PROJECT['title']}). Answer clearly and briefly. Use short paragraphs, and simple lists where they "
+    "help. Do not use LaTeX or tables."
+)
+
+
 def act_task(workflow_id: str) -> str:
     return (f"ACT: apply workflow {workflow_id} to {db.PROJECT['name']} for the employee.")
 
@@ -139,11 +146,16 @@ def preflight(body: PromptIn):
         scratch = tools.start_run(note)
         try:
             kind, reason, workflow = screen["kind"], screen["reason"], None
+            if kind == "review":  # if the agent cannot be reached, do not guess: ask
+                kind = "unsure"
             decided_by = "gate"
             supervisor = agent.get()
             if supervisor:
                 try:
-                    agent.run(supervisor, f"REVIEW this prompt the employee tried to send:\n<prompt>\n{prompt}\n</prompt>")
+                    recent = "\n".join(f"{m['role']}: {m['content'][:300]}" for m in CHAT[-4:])
+                    agent.run(supervisor,
+                              f"REVIEW this prompt the employee tried to send:\n<prompt>\n{prompt}\n</prompt>\n"
+                              f"The conversation so far, for context only:\n<conversation>\n{recent}\n</conversation>")
                     scratch = tools._scratch
                     said = scratch.get("verdict")
                     # The model may explain and refine, but it cannot clear what the rules flagged.
@@ -375,7 +387,7 @@ def chat(body: PromptIn):
 
         agent.spend_run()
         CHAT.append({"role": "user", "content": prompt})
-        reply = init_chat_model(agent.MODEL).invoke(CHAT[-24:])
+        reply = init_chat_model(agent.MODEL).invoke([{"role": "system", "content": WORKSPACE_PROMPT}, *CHAT[-24:]])
         text = reply.content
         if isinstance(text, list):  # some providers answer in content blocks
             text = "".join(part.get("text", "") for part in text if isinstance(part, dict))

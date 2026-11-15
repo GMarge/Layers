@@ -35,7 +35,8 @@ def _quoted(words: list[str]) -> str:
 
 
 def screen(prompt: str) -> dict:
-    """Deterministic first pass. Returns kind, reason and the words that counted each way."""
+    """Deterministic first pass. Returns kind (pass, policy, unsure, reuse or review),
+    the reason, and the words that counted each way."""
     learned = [r["term"] for r in db.query("SELECT term FROM learned_terms")]
     fits = _hits(ON_PROJECT, prompt) + [t for t in learned if t in prompt.lower()]
     against = _hits(OFF_TOPIC, prompt)
@@ -54,7 +55,11 @@ def screen(prompt: str) -> dict:
     if fits and REBUILD.search(prompt):
         return {"kind": "reuse", "signals": {"fits": fits, "against": []},
                 "reason": "This asks to build something the team may already have."}
-    return {"kind": "pass", "signals": {"fits": fits, "against": []}, "reason": ""}
+    if fits:
+        return {"kind": "pass", "signals": {"fits": fits, "against": []}, "reason": ""}
+    # Nothing recognisable either way. The rules cannot clear this, so the agent has to look.
+    return {"kind": "review", "signals": {"fits": [], "against": []},
+            "reason": f"Nothing in this prompt names {project} or anything in its brief."}
 
 
 def learn_from(prompt: str) -> list[str]:

@@ -30,9 +30,11 @@ REVIEW a prompt the employee tried to send:
 1. Call get_project_context and check_company_policy.
 2. If the prompt asks to build something, call search_org_memory to see if the team already has it.
 3. Call submit_verdict exactly once:
-   - pass: the prompt is work on the assigned project.
+   - pass: the prompt is work on the assigned project, or a follow-up that continues project work
+     in the conversation (for example "make that shorter").
    - reuse: an approved workflow already does this. Give its workflow_id.
-   - policy: it is clearly unrelated to the project.
+   - policy: it is clearly unrelated to the project, including general knowledge, homework or
+     personal questions with no link to the brief.
    - unsure: you cannot tell. Say what points each way. Never guess.
 Write the reason for the employee: one or two plain sentences, no jargon.
 
