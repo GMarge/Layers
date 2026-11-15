@@ -142,8 +142,36 @@ export function AgentCluster(props: Props) {
     };
   }, [inBox, anchor, reducedMotion]);
 
-  const [target, setTarget] = useState<Point>(dockPoint);
+  // Start at the intended anchor, rather than flashing at the bottom-right dock.
+  const [target, setTarget] = useState<Point>(() => {
+    if (anchor === 'composer' || anchor === 'absorbed' || anchor === 'hidden') return composerPoint();
+    return home ? clampToView(home) : dockPoint();
+  });
   const arrived = useSpringPosition(clusterRef, target, reducedMotion || anchor === 'drag');
+
+  // The spring's 'arrived' signal is intentionally generous. Do not pop the
+  // speech bubble before the mascot visually reaches the final few pixels.
+  const [bubbleReady, setBubbleReady] = useState(false);
+  useEffect(() => {
+    if (anchor !== 'composer' || emerging || !arrived) {
+      setBubbleReady(false);
+      return;
+    }
+
+    let frame = 0;
+    const check = () => {
+      const r = clusterRef.current?.getBoundingClientRect();
+      if (!r) return;
+      if (Math.hypot(r.left - target.x, r.top - target.y) <= 3) {
+        setBubbleReady(true);
+      } else {
+        frame = requestAnimationFrame(check);
+      }
+    };
+    setBubbleReady(false);
+    check();
+    return () => cancelAnimationFrame(frame);
+  }, [anchor, emerging, arrived]);
 
   const onReserve = useRef(props.onReserveChange);
   onReserve.current = props.onReserveChange;
@@ -215,14 +243,15 @@ export function AgentCluster(props: Props) {
         followPointer={!speaking && !drag}
         presence={presence}
         rising={emerging}
+        reducedMotion={reducedMotion}
         grabbed={!!drag}
-        draggable={!speaking && presence !== 'gone'}
+        draggable={!speaking && !emerging && presence !== 'gone'}
         label={speaking ? 'Layers' : 'Layers. Ask a question, or drag to move.'}
         onClick={props.onMascotClick}
         onDrag={(centre) => setDrag(clampToView(centre))}
         onDrop={onDrop}
       />
-      {arrived && !emerging && anchor === 'composer' && (
+      {arrived && bubbleReady && !emerging && anchor === 'composer' && (
         <Bubble
           key={isCompact(scene) ? 'chip' : 'bubble'}
           scene={scene}

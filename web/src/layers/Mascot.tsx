@@ -69,6 +69,7 @@ interface Props {
   presence: Presence;
   /** True while the droplet is forming out of the chat box. Driven by the cluster so both stay in step. */
   rising: boolean;
+  reducedMotion: boolean;
   grabbed: boolean;
   draggable: boolean;
   label: string;
@@ -79,7 +80,7 @@ interface Props {
 }
 
 export function Mascot(props: Props) {
-  const { shape, mood, nod, followPointer, presence, grabbed, draggable, label } = props;
+  const { shape, mood, nod, followPointer, presence, reducedMotion, grabbed, draggable, label } = props;
   const ref = useRef<HTMLButtonElement>(null);
   const press = useRef<{ id: number; x: number; y: number; dx: number; dy: number; dragging: boolean } | null>(null);
   const suppressClick = useRef(false);
@@ -91,15 +92,19 @@ export function Mascot(props: Props) {
   useEffect(() => {
     const from = settled.current;
     settled.current = presence;
-    if (from === presence) return;
-    if (from !== 'out') {
+    if (from === presence) {
+      // A motion-preference change must not leave an interrupted melt frozen.
+      if (reducedMotion) setPhase(presence);
+      return;
+    }
+    if (from !== 'out' || reducedMotion) {
       setPhase(presence);
       return;
     }
     setPhase('sinking');
     const timer = setTimeout(() => setPhase(presence), SINK_MS);
     return () => clearTimeout(timer);
-  }, [presence]);
+  }, [presence, reducedMotion]);
   const shown: Phase = props.rising ? 'rising' : phase;
 
   // Resting eyes drift toward the pointer. Everywhere else the mood sets the gaze.

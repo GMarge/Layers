@@ -1296,10 +1296,15 @@ li[data-status='done'] .steps__mark {
 }
 
 .mascot__melt {
-  transition: opacity 200ms;
+  /* Keep all transitions within the same animation timeline. */
+  transition: none;
 }
 
-.mascot:is([data-phase='sinking'], [data-phase='in'], [data-phase='gone']) .mascot__melt {
+.mascot[data-phase='sinking'] .mascot__melt {
+  animation: body-sink 800ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.mascot:is([data-phase='in'], [data-phase='gone']) .mascot__melt {
   opacity: 0;
 }
 
@@ -1360,13 +1365,11 @@ li[data-status='done'] .steps__mark {
 }
 
 .mascot[data-phase='rising'] .nib-eyes {
-  animation:
-    eyes-up 900ms cubic-bezier(0.4, 0, 0.2, 1) both,
-    eyes-hide 200ms linear 700ms both;
+  animation: eyes-up 900ms cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
 .mascot[data-phase='rising'] .mascot__melt {
-  animation: body-show 240ms linear 660ms both;
+  animation: body-show 900ms linear both;
 }
 
 /* Melting */
@@ -1420,39 +1423,51 @@ li[data-status='done'] .steps__mark {
 }
 
 @keyframes eyes-up {
-  from {
-    transform: translateY(0) scale(1);
+  0%, 68% {
+    opacity: 1;
   }
-  to {
+  84%, 100% {
+    opacity: 0;
     transform: translateY(var(--eye-lift)) scale(1.33);
+  }
+  0% {
+    transform: translateY(0) scale(1);
   }
 }
 
 @keyframes eyes-down {
-  from {
-    opacity: 1;
+  0%, 14% {
+    opacity: 0;
     transform: translateY(var(--eye-lift)) scale(1.33);
   }
-  to {
+  34% {
+    opacity: 1;
+  }
+  100% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
 
-@keyframes eyes-hide {
-  from {
+@keyframes body-sink {
+  0%, 10% {
     opacity: 1;
+    transform: translateY(0) scale(1);
   }
-  to {
+  33%, 100% {
     opacity: 0;
+    transform: translateY(3px) scale(0.94);
   }
 }
 
 @keyframes body-show {
-  from {
+  0%, 71% {
     opacity: 0;
   }
-  to {
+  88% {
+    opacity: 0.65;
+  }
+  100% {
     opacity: 1;
   }
 }
