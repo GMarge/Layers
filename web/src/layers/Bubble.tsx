@@ -541,8 +541,8 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
               onChange={(outline) => a.setPrefs({ outline })}
             />
             <p className="b-fine">
-              Press <kbd>Alt</kbd> <kbd>L</kbd> any time to hide me or bring me back. Hidden or not, I still check
-              each prompt when you press Send.
+              Right-click me to hide me, and right-click the same spot to bring me back. <kbd>Alt</kbd> <kbd>L</kbd>{' '}
+              does both. Hidden or not, I still check each prompt when you press Send.
             </p>
             <div className="b-detail">
               <p className="b-rule">Set by {manager.name}'s team</p>

@@ -88,8 +88,8 @@ interface Props {
   draggable: boolean;
   label: string;
   onClick: () => void;
-  /** Right-click: hide him. */
-  onHide: () => void;
+  /** Right-click: open his menu at that point. */
+  onMenu: (at: Point) => void;
   /** Positions are where the mascot's centre should be, in viewport pixels. */
   onDrag: (centre: Point) => void;
   onDrop: (centre: Point) => void;
@@ -265,7 +265,10 @@ export function Mascot(props: Props) {
       onClick={onClick}
       onContextMenu={(e) => {
         e.preventDefault();
-        props.onHide();
+        // The menu key gives no pointer position, so open it on him instead.
+        const r = e.currentTarget.getBoundingClientRect();
+        const fromKeys = e.clientX === 0 && e.clientY === 0;
+        props.onMenu(fromKeys ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: e.clientX, y: e.clientY });
       }}
       onPointerDown={onPointerDown}
     >

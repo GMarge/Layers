@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMediaQuery } from '../ui/useMediaQuery';
+import { AgentMenu } from './AgentMenu';
 import { Bubble, isCompact, type BubbleActions, type BubblePlacement, type Prefs } from './Bubble';
 import { Mascot, type Mood, type Presence, type Shape } from './Mascot';
 import type { Counters, Placement, RestMode, Scene } from './types';
@@ -117,6 +118,8 @@ export function AgentCluster(props: Props) {
   const narrow = useMediaQuery('(max-width: 640px)');
 
   const [drag, setDrag] = useState<Point | null>(null);
+  /** Where the right-click menu is open, if it is. */
+  const [menu, setMenu] = useState<Point | null>(null);
   const [home, setHome] = useState<Point | null>(loadHome);
 
   const speaking = isSpeaking(scene);
@@ -281,6 +284,37 @@ export function AgentCluster(props: Props) {
   onOver.current = props.onOverBoxChange;
   useEffect(() => onOver.current(over), [over]);
 
+  // Right-click opens a one-line menu: hide him when he is showing, show him when he is hidden.
+  const hiddenNow = presence === 'gone';
+  const busy = scene.name === 'working' || scene.name === 'checking';
+  useEffect(() => {
+    if (!hiddenNow) return;
+    // Nothing of him is on screen to click, so listen for a right-click where he was.
+    // Anywhere else, the browser's own menu still opens as usual.
+    const onContext = (e: MouseEvent) => {
+      const r = clusterRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const dx = e.clientX - r.left;
+      const dy = e.clientY - r.top;
+      if (Math.abs(dx) > 44 || dy < -44 || dy > 60) return;
+      e.preventDefault();
+      setMenu({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('contextmenu', onContext, true);
+    return () => window.removeEventListener('contextmenu', onContext, true);
+  }, [hiddenNow]);
+
+  const chooseMenu = () => {
+    setMenu(null);
+    if (hiddenNow) {
+      props.actions.toggleHidden();
+      return;
+    }
+    // Hiding puts away whatever he was saying. A held prompt keeps its Review link.
+    if (speaking) props.actions.dismiss();
+    if (rest !== 'hidden') props.actions.toggleHidden();
+  };
+
   /** Dropping the agent on the chat box tucks it in. Anywhere else becomes its new spot. */
   const onDrop = (centre: Point) => {
     setDrag(null);
@@ -298,7 +332,16 @@ export function AgentCluster(props: Props) {
   const mood: Mood = scene.name === 'decided' && scene.approved ? 'happy' : MOODS[scene.name];
 
   return (
-    <div className="cluster" ref={clusterRef} data-place={place}>
+    <>
+      {menu && (
+        <AgentMenu
+          at={menu}
+          label={hiddenNow ? 'Show Layers' : 'Hide Layers'}
+          onChoose={chooseMenu}
+          onClose={() => setMenu(null)}
+        />
+      )}
+      <div className="cluster" ref={clusterRef} data-place={place}>
       <Mascot
         shape={props.shape}
         mood={mood}
@@ -313,7 +356,9 @@ export function AgentCluster(props: Props) {
         draggable={!emerging && presence !== 'gone' && scene.name !== 'working' && scene.name !== 'checking'}
         label={speaking ? 'Layers. Drag to move.' : 'Layers. Ask a question, or drag to move.'}
         onClick={props.onMascotClick}
-        onHide={props.actions.toggleHidden}
+        onMenu={(at) => {
+          if (!busy) setMenu(at);
+        }}
         onDrag={(centre) => {
           // Picking him up while he is talking puts the bubble away. A tap brings it back.
           if (!drag && speaking) props.actions.dismiss();
@@ -333,6 +378,7 @@ export function AgentCluster(props: Props) {
           bubbleRef={bubbleRef}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }
