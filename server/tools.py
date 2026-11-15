@@ -6,6 +6,7 @@ reported to the interface as it happens, and written to the audit log.
 """
 
 import json
+import re
 import threading
 import time
 import uuid
@@ -24,6 +25,10 @@ LABELS = {
     "request_manager_approval": f"Asking {db.MANAGER} to take a look",
     "submit_verdict": "Deciding what to do with this prompt",
     "get_todays_activity": "Reading what got done today",
+    "search_team_processes": "Looking at how teammates did this",
+    "get_branch_map": "Reading the shape of your conversation",
+    "read_branch": "Reading one branch of it",
+    "point_to": "Pointing to where it is",
     "send_status_update": f"Sending the update to {db.MANAGER}",
 }
 
@@ -88,12 +93,35 @@ def _can_use(row: dict) -> bool:
     return db.EMPLOYEE["team"] in json.loads(row["shared_with"])
 
 
+def _ago(ts: float) -> str:
+    days = int((time.time() - ts) // 86400)
+    return "today" if days <= 0 else "yesterday" if days == 1 else f"{days} days ago"
+
+
+def team_processes(workflow_id: str | None = None) -> list[dict]:
+    """What people on the employee's own team have done, newest first. Other teams' work is
+    filtered out here, in code, before anything reaches the model or the browser."""
+    found = []
+    for row in db.query("SELECT * FROM processes ORDER BY created_at DESC"):
+        if row["team"] != db.EMPLOYEE["team"] or (workflow_id and row["workflow_id"] != workflow_id):
+            continue
+        used = _workflow_row(row["workflow_id"]) if row["workflow_id"] else None
+        found.append({"who": row["person"], "project": row["project"], "did": row["did"],
+                      "path": json.loads(row["path"] or "[]"), "workflow": used["name"] if used else "",
+                      "workflow_id": row["workflow_id"] or "", "when": _ago(row["created_at"]),
+                      "sample": bool(row["sample"])})
+    return found
+
+
 def workflow_public(row: dict) -> dict:
+    others = [p for p in team_processes(row["id"]) if p["who"] != db.EMPLOYEE["name"]]
     return {
         "id": row["id"], "name": row["name"], "kind": row["kind"], "summary": row["summary"],
         "author": row["author"], "team": row["team"], "reviewedOn": row["reviewed_on"],
         "approvedBy": row["approved_by"], "access": row["access"],
         "columns": json.loads(row["columns"]), "inputs": row["inputs"],
+        # Who on the team has already used it, and for what.
+        "usedBy": [{"who": p["who"], "project": p["project"]} for p in others][:3],
     }
 
 
@@ -167,6 +195,14 @@ def create_project_artifact(workflow_id: str) -> str:
                    (artifact_id, f"{db.PROJECT['name']} {plan['title']}", row["name"], row["author"],
                     json.dumps(columns), json.dumps(rows), time.time()))
         _scratch["artifact_id"] = artifact_id
+        # Add it to what the team can learn from: the steps this conversation went through.
+        shape = json.loads(db.setting("branches") or "null") or {"lines": []}
+        steps = [line["label"] for line in shape["lines"] if line.get("label") not in (None, "New branch", "Other direction")]
+        db.execute("INSERT INTO processes (person, team, project, workflow_id, did, path, created_at, sample) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?, 0)",
+                   (db.EMPLOYEE["name"], db.EMPLOYEE["team"], db.PROJECT["name"], row["id"],
+                    f"Applied {row['name']} to {db.PROJECT['name']}", json.dumps(list(dict.fromkeys(steps))[:6]),
+                    time.time()))
         return f"Created {artifact_id}.", f"{len(rows)} rows, {len(columns)} columns"
     return _traced("create_project_artifact", body)
 
@@ -261,6 +297,71 @@ def send_status_update(text: str) -> str:
     return _traced("send_status_update", body)
 
 
+def search_team_processes(query: str) -> str:
+    """Search how people on the employee's team have done similar work: who did it, on which
+    project, the steps they went through, and the approved workflow they used."""
+    def body():
+        words = re.findall(r"[a-z]{4,}", query.lower())
+        scored = []
+        for process in team_processes():
+            if process["who"] == db.EMPLOYEE["name"]:
+                continue
+            hay = f"{process['did']} {' '.join(process['path'])} {process['workflow']} {process['project']}".lower()
+            score = sum(1 for word in words if word[:6] in hay)
+            if score:
+                scored.append((score, process))
+        scored.sort(key=lambda match: -match[0])
+        found = [match[1] for match in scored][:4]
+        return json.dumps(found), (", ".join(dict.fromkeys(p["who"] for p in found)) if found else "nothing found")
+    return _traced("search_team_processes", body)
+
+
+def get_branch_map() -> str:
+    """Return the shape of the employee's conversation: each branch with its name, its kind, how
+    many prompts are on it and how its first prompt starts. Use it to decide where to look,
+    instead of reading every chat."""
+    def body():
+        index = [{"branch": b["label"], "kind": {"main": "where it started", "implicit": "a direction that was noticed",
+                                                 "explicit": "its own chat"}[b["kind"]],
+                  "prompts": len(b["prompts"]), "starts": b["prompts"][0]["text"][:70] if b["prompts"] else ""}
+                 for b in _scratch.get("branches") or []]
+        return json.dumps(index), f"{len(index)} branches"
+    return _traced("get_branch_map", body)
+
+
+def _branch(name: str) -> dict | None:
+    for branch in _scratch.get("branches") or []:
+        if branch["label"].lower() == str(name).strip().lower():
+            return branch
+    return None
+
+
+def read_branch(branch: str) -> str:
+    """Return the prompts on one branch of the employee's conversation, by the branch's name."""
+    def body():
+        found = _branch(branch)
+        if not found:
+            return "No branch has that name.", "not found"
+        prompts = [{"number": p["n"] + 1, "text": p["text"]} for p in found["prompts"]]
+        return json.dumps(prompts), f"{found['label']}, {len(prompts)} prompts"
+    return _traced("read_branch", body)
+
+
+def point_to(branch: str, prompt_number: int, what: str) -> str:
+    """Say where the thing the employee asked about is: the branch, the number of the prompt, and
+    one sentence on what is there."""
+    def body():
+        found = _branch(branch)
+        for prompt in (found or {}).get("prompts", []):
+            if prompt["n"] + 1 == int(prompt_number):
+                _scratch["found"] = {"line": found["id"], "index": prompt["n"], "label": found["label"],
+                                     "prompt": prompt["text"], "what": " ".join(str(what).split())[:240]}
+                return "Recorded.", f"{found['label']}, prompt {prompt_number}"
+        raise ValueError("that branch does not have a prompt with that number")
+    return _traced("point_to", body)
+
+
 REVIEW_TOOLS = [get_project_context, check_company_policy, search_org_memory, submit_verdict]
 ACTION_TOOLS = [search_org_memory, check_access, create_project_artifact, update_task_status,
-                request_manager_approval, get_todays_activity, send_status_update]
+                request_manager_approval, get_todays_activity, send_status_update,
+                search_team_processes, get_branch_map, read_branch, point_to]

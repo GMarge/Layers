@@ -6,8 +6,9 @@ import {
   outlineSections,
   project,
   readoutOutline,
+  teamProcesses,
 } from '../workspace/data';
-import type { AskAnswer, KnowledgeItem, LayersService, Step, Verdict } from './types';
+import type { AskAnswer, BranchIndex, KnowledgeItem, LayersService, Step, Verdict } from './types';
 
 /**
  * Scripted stand-in for the Layers API. Nothing here calls a model.
@@ -91,7 +92,36 @@ const ASKS_LIMITS = /\b(limits?|allowed|rules?|policy|policies|what can i)\b/i;
 const ASKS_EXISTING = /\b(built|already|existing|template|workflow|matrix|spreadsheet|reuse|anyone)\b/i;
 const PERSONAL = /\b(personal|travel|side project|my own|homework|weekend)\b/i;
 
+const ASKS_WHERE = /\b(where (did|is|was|were)|find|which (chat|branch)|did i (ask|already)|when did i|look for|locate)\b/i;
+const ASKS_TEAM = /\b(who else|teammates?|anyone else|how (did|have|has)|colleagues?|other people|someone else|others)\b/i;
+const SKIP = new Set(['where', 'find', 'asked', 'about', 'talk', 'talked', 'chat', 'branch', 'which', 'when', 'have', 'that', 'this', 'with', 'what']);
+
+/** Find a prompt by following the branches: the branch that shares most words, then the prompt in it. */
+function findIn(question: string, branches: BranchIndex[]): AskAnswer {
+  const words = (question.toLowerCase().match(/[a-z]{4,}/g) ?? []).filter((w) => !SKIP.has(w)).map((w) => w.slice(0, 6));
+  const score = (text: string) => words.filter((w) => text.toLowerCase().includes(w)).length;
+  let best: { branch: BranchIndex; n: number; text: string; points: number } | null = null;
+  for (const branch of branches) {
+    for (const prompt of branch.prompts) {
+      const points = score(prompt.text) + 2 * score(branch.label);
+      if (points > 0 && (!best || points > best.points)) best = { branch, n: prompt.n, text: prompt.text, points };
+    }
+  }
+  if (!best) return { text: 'I followed the branches of this conversation and could not find that.' };
+  return {
+    text: `It is in ${best.branch.label}, prompt ${best.n + 1}.`,
+    found: { line: best.branch.id, index: best.n, label: best.branch.label, prompt: best.text },
+  };
+}
+
 function answer(question: string): AskAnswer {
+  if (ASKS_TEAM.test(question)) {
+    return {
+      text: 'Ines and Marcus on your team have done work like this. Here is how.',
+      processes: teamProcesses.slice(0, 2),
+      item: competitorMatrix,
+    };
+  }
   if (ASKS_LIMITS.test(question)) {
     return {
       text: `Two rules apply to you in this workspace. Anything tied to ${project.name} goes straight through.`,
@@ -211,9 +241,9 @@ export function createMockService(speed: () => number = () => 1): LayersService 
       });
     },
 
-    async ask(question) {
+    async ask(question, branches) {
       await wait(700 * speed());
-      return answer(question);
+      return branches && ASKS_WHERE.test(question) ? findIn(question, branches) : answer(question);
     },
 
     async requestApproval() {

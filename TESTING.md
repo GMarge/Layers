@@ -6,7 +6,7 @@
 cd ~/layers && .venv/bin/python -m tests.smoke
 ```
 
-32 checks in a few seconds. It is free: it runs on a copy of the server with no model and its own empty database, so it never touches the running app or your model-run count. Run it after any change. If a line says `FAIL`, that is the thing that broke.
+39 checks in a few seconds. It is free: it runs on a copy of the server with no model and its own empty database, so it never touches the running app or your model-run count. Run it after any change. If a line says `FAIL`, that is the thing that broke.
 
 There is a second one for the agent's wiring (the pause before it creates or sends anything). It uses a scripted stand-in for the model, so it is free too:
 
@@ -17,6 +17,8 @@ cd ~/layers && .venv/bin/python -m tests.test_agent_wiring
 ## Before each run through
 
 - Press **Start over** at the bottom of the sidebar. Chats are kept across a refresh, so a refresh alone does not give you a clean slate.
+- **Refresh**, in the dark bar at the top, starts the whole demo over.
+- Wait for each answer before sending the next prompt. The free model slows down when prompts come back to back, and a check can then take a minute. The agent says "Still checking" when that happens.
 - **Try it**, in the dark bar at the top, has every example below as one click. Each one types the prompt and sends it for you. It is there at any window size.
 - Each real prompt uses 1 to 3 of the 60 model runs allowed per day. When they run out, Layers says so and works on rules alone. To set the count back to zero:
 
@@ -40,10 +42,16 @@ cd ~/layers && sqlite3 layers.db "delete from settings where key like 'runs:%'"
 | 8 | Send `Draft an email to Priya with my status update` | "I'm not sure this fits Project X." It shows what counted each way and the agent's own reading, with a box asking how it connects. The agent cannot settle this one by itself. |
 | 8b | Type a reason and click **Send with my reason** | It is sent, and your reason is logged with it. Layers remembers the words, so the same kind of prompt is not questioned again. |
 
+| 8c | Send `Summarize Stocksmith pricing and plan my ski weekend` | Not sure, with "Part of this is project work" and the cut-down prompt. **Send only that part** sends it and sets your full draft aside. |
+| 8d | Send `Write a thank-you note to the team for last week` | Not sure, with a specific question from the agent, such as whether it is about Project X. |
+| 8e | Send `asdf` | Not sure. The agent asks what you meant. |
+
 ### The agent
 
 | # | Do this | What should happen |
 |---|---|---|
+| 8f | Tap the agent and ask `Where did I ask about pricing?` | The prompt it found and the branch it is on, with **Go to it**. In "What Layers did" the run shows it read the branch map, then one branch. |
+| 8g | Tap the agent and ask `How have teammates done this?` | Who on the team did similar work, the steps they took and the workflow they used. |
 | 9 | Send `Build me an Excel automation that compares our five competitors` | "Your team already built this", with `CompetitorMatrix_v2`. |
 | 10 | Click **Use it for Project X** | The agent's plan, then each tool call. One line reads "Paused until you approved". A sheet with the five competitors lands in the chat. |
 | 11 | Click **What I did**, then **Undo** | The steps with timings. Undo removes the sheet and resets the task. |
@@ -73,6 +81,9 @@ cd ~/layers && sqlite3 layers.db "delete from settings where key like 'runs:%'"
 | 25 | Choose **Send it to me** for unclear prompts, then send an unclear prompt | It goes to **Needs you** by itself, with the reason. |
 | 26 | Click **Marcus Bell**, then **Ines Okafor** | Their sample activity, progress and branch maps. They are marked Sample. |
 | 27 | Look at Gavin's branch map | Lines named by project area. No prompt text anywhere. |
+| 27b | Click a dot, a line's name, a red stop, then a task under Progress | A card explains each one: how many prompts, how many visits, when, what it split from. A task lights up its lines on the map. |
+| 27c | On any branch map, click **Compress**, then **Expand** | Runs fold into zigzags, then every prompt comes back. Click a number to open one run, or the small bar above an open run to fold it. |
+| 27d | Scroll to **How the team works** | Each person's steps and the workflow they reused. Gavin's appears after he applies one. |
 | 28 | **Audit trail**, Show | One line per check, tool call and decision, with timings. No prompt text. |
 | 29 | Open **Side by side** | Both views at once. An approval on the right lands on the left within two seconds. |
 

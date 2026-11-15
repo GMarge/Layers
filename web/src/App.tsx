@@ -486,6 +486,12 @@ export default function App({ active = true }: { active?: boolean }) {
     let verdict: Verdict;
     const began = performance.now();
     let seen: Step[] = [];
+    // A free model tier slows down when it is asked a lot at once. Say so instead of looking stuck.
+    const slow = setTimeout(() => {
+      if (token === run.current && sceneRef.current.name === 'checking') {
+        setScene({ name: 'checking', engaged: true, note: 'Still checking. The model is answering slowly right now' });
+      }
+    }, 14000);
     try {
       verdict = await service.preflight(
         prompt,
@@ -499,11 +505,13 @@ export default function App({ active = true }: { active?: boolean }) {
         where(),
       );
     } catch {
+      clearTimeout(slow);
       if (token !== run.current) return;
       setScene({ name: 'ambient' });
       notify(`${name} could not check that, so nothing was sent.`);
       return;
     }
+    clearTimeout(slow);
     if (token !== run.current) return;
     if (verdict.topic !== undefined) hints.current.set(prompt, verdict.topic);
     logRun({
@@ -532,8 +540,27 @@ export default function App({ active = true }: { active?: boolean }) {
     if (!q) return;
     const token = ++run.current;
     setScene({ name: 'ask', question: q, busy: true, answer: null });
-    const answer = await service.ask(q);
+    // The branches go with the question, so the agent can follow them to find things.
+    const t = treeRef.current;
+    const index = t.lines.map((line) => ({
+      id: line.id,
+      label: chatTitle(t, line.id, ROOT_TITLE),
+      kind: line.kind,
+      prompts: t.nodes.map((node, n) => ({ node, n })).filter(({ node }) => node.line === line.id).map(({ node, n }) => ({ n, text: node.text.slice(0, 300) })),
+    }));
+    const began = performance.now();
+    const answer = await service.ask(q, index);
     if (token !== run.current) return;
+    if (answer.steps && answer.steps.length > 0) {
+      logRun({
+        kind: 'ask',
+        prompt: q,
+        by: !backend ? 'preview' : answer.by === 'agent' ? 'agent' : 'code',
+        outcome: answer.text,
+        steps: answer.steps,
+        ms: Math.round(performance.now() - began),
+      });
+    }
     setScene({ name: 'ask', question: q, busy: false, answer });
   };
 
@@ -1044,6 +1071,12 @@ export default function App({ active = true }: { active?: boolean }) {
     sendDraft,
     sendWithNote,
     sendTrimmed,
+    goTo: (index) => {
+      const node = treeRef.current.nodes[index];
+      if (!node) return;
+      setScene({ name: 'ambient' });
+      openNode(node.id);
+    },
     toggleHidden,
     openSettings: () => setScene({ name: 'settings' }),
     mergeBranch: (lineId) => {
@@ -1234,14 +1267,14 @@ export default function App({ active = true }: { active?: boolean }) {
         reserve={reserve}
         status={
           !backend
-            ? 'Preview without the Layers server. Checks and branches work; answers are placeholders.'
+            ? 'Preview, no server: checks and branches work, answers are placeholders.'
             : backend.agent
               ? usage && usage.used >= usage.cap
-                ? `Today's ${usage.cap} model runs are used up, so Layers is working on its rules alone.`
-                : `Live agent on ${(backend.model ?? '').split(':').pop()}.${usage ? ` ${usage.used} of ${usage.cap} model runs used today.` : ''}`
+                ? `Today's ${usage.cap} model runs are used up, so Layers is on its rules alone.`
+                : `Live agent: ${(backend.model ?? '').split(':').pop()}.${usage ? ` ${usage.used} of ${usage.cap} runs used today.` : ''}`
               : backend.model
-                ? 'Live server on rules only. The model did not load.'
-                : 'Live server on rules only. No model key is set.'
+                ? 'Rules only: the model did not load.'
+                : 'Rules only: no model key is set.'
         }
         onReset={reset}
         onDraftChange={changeDraft}

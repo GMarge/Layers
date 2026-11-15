@@ -42,6 +42,8 @@ export interface PromptNode {
   reopened: boolean;
   /** Which visit to the line this prompt started: 2 for the first time back, and so on. */
   visit: number;
+  /** When it was sent, in seconds since 1970. */
+  at?: number;
 }
 
 /**
@@ -57,6 +59,7 @@ export interface Stop {
   why: 'policy' | 'unsure';
   /** held: stopped, and left there. waiting: with the manager. declined: the manager said no. */
   state: 'held' | 'waiting' | 'declined';
+  at?: number;
 }
 
 export interface Tree {
@@ -70,7 +73,8 @@ export interface Tree {
 export function addStop(tree: Tree, text: string, why: Stop['why'], state: Stop['state'] = 'held'): Tree {
   const rest = (tree.stops ?? []).filter((s) => s.text !== text);
   const id = `s${Date.now().toString(36)}${rest.length}`;
-  return { ...tree, stops: [...rest, { id, line: tree.active, after: tree.nodes.length - 1, text, why, state }] };
+  const at = Date.now() / 1000;
+  return { ...tree, stops: [...rest, { id, line: tree.active, after: tree.nodes.length - 1, text, why, state, at }] };
 }
 
 export function markStop(tree: Tree, text: string, state: Stop['state']): Tree {
@@ -197,7 +201,15 @@ export function addPrompt(tree: Tree, text: string, seq: number, hint?: TopicHin
     target = { ...target, visits: target.visits + 1 };
     lines = swap(lines, target);
   }
-  const node: PromptNode = { id: `n${tree.nodes.length}`, line: target.id, text, seq, reopened, visit: target.visits };
+  const node: PromptNode = {
+    id: `n${tree.nodes.length}`,
+    line: target.id,
+    text,
+    seq,
+    reopened,
+    visit: target.visits,
+    at: Date.now() / 1000,
+  };
   return {
     tree: { ...tree, lines, nodes: [...tree.nodes, node], active: target.id },
     branched,
@@ -357,14 +369,17 @@ export interface MapShape {
     label: string;
     merged: boolean;
     promoted: boolean;
+    /** The project task this line of work belongs to, when it is one of them. */
+    task?: string | null;
   }[];
-  nodes: { line: string; reopened: boolean; visit: number }[];
+  nodes: { line: string; reopened: boolean; visit: number; at?: number | null }[];
   active: string;
-  /** Prompts that were stopped: where, and how it ended. Never what they said. */
-  stops?: { line: string; after: number; state: Stop['state'] }[];
+  /** Prompts that were stopped: where, why and how it ended. Never what they said. */
+  stops?: { line: string; after: number; state: Stop['state']; why?: Stop['why']; at?: number | null }[];
 }
 
-const stopShapes = (tree: Tree) => (tree.stops ?? []).map((s) => ({ line: s.line, after: s.after, state: s.state }));
+const stopShapes = (tree: Tree) =>
+  (tree.stops ?? []).map((s) => ({ line: s.line, after: s.after, state: s.state, why: s.why, at: s.at ?? null }));
 
 export function shapeOf(tree: Tree, rootTitle?: string): MapShape {
   return {
@@ -377,7 +392,7 @@ export function shapeOf(tree: Tree, rootTitle?: string): MapShape {
       merged: l.merged,
       promoted: !!l.promoted,
     })),
-    nodes: tree.nodes.map((n) => ({ line: n.line, reopened: n.reopened, visit: n.visit })),
+    nodes: tree.nodes.map((n) => ({ line: n.line, reopened: n.reopened, visit: n.visit, at: n.at ?? null })),
     active: tree.active,
     stops: stopShapes(tree),
   };
@@ -396,7 +411,7 @@ export function outlineOf(tree: Tree) {
       merged: l.merged,
       promoted: !!l.promoted,
     })),
-    nodes: tree.nodes.map((n) => ({ line: n.line, reopened: n.reopened, visit: n.visit })),
+    nodes: tree.nodes.map((n) => ({ line: n.line, reopened: n.reopened, visit: n.visit, at: n.at ?? null })),
     active: tree.active,
     stops: stopShapes(tree),
   };

@@ -356,12 +356,17 @@ const TOOLS: [name: string, does: string, waits?: boolean][] = [
   ['request_manager_approval', 'Ask your manager to decide'],
   ['get_todays_activity', 'Read what got done today: tasks, documents and counts, never what you typed'],
   ['send_status_update', 'Send your manager an update you have read', true],
+  ['search_team_processes', 'See how people on your team did similar work'],
+  ['get_branch_map', 'Read the shape of your conversation, to know where to look'],
+  ['read_branch', 'Read one branch of it, not every chat'],
+  ['point_to', 'Point to the prompt you asked about'],
 ];
 
 const DID: Record<AgentRun['kind'], string> = {
   review: 'Checked a prompt',
   apply: 'Applied a team workflow',
   update: 'Drafted an update',
+  ask: 'Answered a question',
 };
 
 const BY: Record<AgentRun['by'], string> = {

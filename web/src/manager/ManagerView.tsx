@@ -50,6 +50,8 @@ interface ManagerData {
   team: Member[];
   settings: Settings;
   rules: { id: string; name: string; text: string }[];
+  /** How people on the team did their work: steps taken and the workflow used. */
+  processes: { who: string; project: string; did: string; path: string[]; workflow: string; when: string; sample: boolean }[];
   /** The audit log in plain words. What the employee typed is not in it. */
   audit: { ts: number; who: string; what: string; note: string }[];
 }
@@ -64,6 +66,154 @@ const UNSURE: [Settings['unsure_mode'], string][] = [
   ['allow', 'Send it and log it'],
   ['defer', 'Send it to me'],
 ];
+
+type Pick = { kind: 'node'; i: number } | { kind: 'line'; id: string } | { kind: 'stop'; k: number } | { kind: 'task'; id: string } | null;
+
+const ordinal = (n: number) => `${n}${n % 10 === 1 && n !== 11 ? 'st' : n % 10 === 2 && n !== 12 ? 'nd' : n % 10 === 3 && n !== 13 ? 'rd' : 'th'}`;
+
+/** What one line of the conversation is, in a sentence the manager can act on. */
+function lineKind(line: MapShape['lines'][number], first: string): string {
+  if (line.kind === 'main') return 'Where the conversation started.';
+  if (line.kind === 'implicit') return `A direction Layers noticed${line.merged ? `, since merged back in` : ''}.`;
+  return line.promoted ? `Its own chat. Layers moved it there after ${first} kept coming back to it.` : `Its own chat, branched by ${first}.`;
+}
+
+/** The card under the manager's branch map: whatever was clicked, explained, with no prompt text. */
+function Detail(props: { pick: Pick; shape: MapShape; tasks: Task[]; first: string; onPick(pick: Pick): void }) {
+  const { pick, shape, tasks, first, onPick } = props;
+  if (!pick) {
+    return <p className="mgr__empty">Click a dot, a line's name, a red stop, or a task above to see more.</p>;
+  }
+  const lineOf = (id: string) => shape.lines.find((l) => l.id === id);
+  const count = (id: string) => shape.nodes.filter((n) => n.line === id).length;
+  const times = (id: string) => shape.nodes.filter((n) => n.line === id && n.at).map((n) => n.at as number);
+  const taskOf = (id: string | null | undefined) => tasks.find((t) => t.id === id);
+
+  if (pick.kind === 'node') {
+    const node = shape.nodes[pick.i];
+    const line = node && lineOf(node.line);
+    if (!node || !line) return null;
+    return (
+      <div className="mgr__detail">
+        <p>
+          <b>
+            Prompt {pick.i + 1} of {shape.nodes.length}
+          </b>
+          {node.at ? `, sent at ${clock(node.at)}` : ''}. On <b>{line.label}</b>
+          {node.reopened ? `, the ${ordinal(node.visit)} time ${first} came back to it` : ''}.
+        </p>
+        <p className="mgr__empty">What it said is not shown. It went through, so it was on the project or approved.</p>
+        <button type="button" className="mgr__more" onClick={() => onPick({ kind: 'line', id: line.id })}>
+          See this line
+        </button>
+      </div>
+    );
+  }
+
+  if (pick.kind === 'stop') {
+    const stop = shape.stops?.[pick.k];
+    const line = stop && lineOf(stop.line);
+    if (!stop || !line) return null;
+    return (
+      <div className="mgr__detail">
+        <p>
+          <b>A prompt was stopped here</b>
+          {stop.at ? ` at ${clock(stop.at)}` : ''}, while {first} was on <b>{line.label}</b>.{' '}
+          {stop.why === 'unsure' ? 'Layers could not tell if it was project work.' : 'It was off project, under rule AI-01.'}
+        </p>
+        <p className="mgr__empty">
+          {stop.state === 'waiting'
+            ? 'It is waiting on you, in Needs you at the top of this page.'
+            : stop.state === 'declined'
+              ? 'You declined it, so it was never sent.'
+              : `${first} left it there. It was never sent, and you were not asked.`}
+        </p>
+      </div>
+    );
+  }
+
+  if (pick.kind === 'task') {
+    const task = taskOf(pick.id);
+    const lines = shape.lines.filter((l) => l.task === pick.id);
+    const prompts = lines.reduce((sum, l) => sum + count(l.id), 0);
+    if (!task) return null;
+    return (
+      <div className="mgr__detail">
+        <p>
+          <b>{task.title}</b>: {task.status === 'done' ? 'done' : task.status === 'doing' ? 'in progress' : 'not started'}.{' '}
+          {lines.length === 0
+            ? `Nothing in ${first}'s conversation has been about it yet.`
+            : `${plural(prompts, 'prompt', 'prompts')} went to it, on ${plural(lines.length, 'line', 'lines')}, lit up on the map.`}
+        </p>
+        <div className="mgr__chips">
+          {lines.map((l) => (
+            <button key={l.id} type="button" className="mgr__more" onClick={() => onPick({ kind: 'line', id: l.id })}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const line = lineOf(pick.id);
+  if (!line) return null;
+  const n = count(line.id);
+  const share = Math.round((n / Math.max(1, shape.nodes.length)) * 100);
+  const visits = Math.max(1, ...shape.nodes.filter((x) => x.line === line.id).map((x) => x.visit));
+  const when = times(line.id);
+  const parent = line.parent ? lineOf(line.parent) : undefined;
+  const task = taskOf(line.task);
+  const stopped = (shape.stops ?? []).filter((s) => s.line === line.id).length;
+  return (
+    <div className="mgr__detail">
+      <p>
+        <b>{line.label}.</b> {lineKind(line, first)}
+      </p>
+      <dl className="mgr__facts">
+        <div>
+          <dt>Prompts</dt>
+          <dd>
+            {n} <span>({share}% of the conversation)</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Visits</dt>
+          <dd>{visits}</dd>
+        </div>
+        {when.length > 0 && (
+          <div>
+            <dt>Active</dt>
+            <dd>
+              {clock(Math.min(...when))}
+              {when.length > 1 ? ` to ${clock(Math.max(...when))}` : ''}
+            </dd>
+          </div>
+        )}
+        {parent && (
+          <div>
+            <dt>Split from</dt>
+            <dd>
+              {parent.label}
+              {line.fork !== null && line.fork >= 0 ? `, after prompt ${line.fork + 1}` : ''}
+            </dd>
+          </div>
+        )}
+        {stopped > 0 && (
+          <div>
+            <dt>Stopped here</dt>
+            <dd>{plural(stopped, 'prompt', 'prompts')}</dd>
+          </div>
+        )}
+      </dl>
+      {task && (
+        <button type="button" className="mgr__more" onClick={() => onPick({ kind: 'task', id: task.id })}>
+          Works towards: {task.title}
+        </button>
+      )}
+    </div>
+  );
+}
 
 function Choice<T extends string>(props: { label: string; value: T; options: [T, string][]; onChange(value: T): void }) {
   return (
@@ -106,6 +256,8 @@ export function ManagerView() {
   const [busy, setBusy] = useState<string | null>(null);
   const [chosen, setChosen] = useState('me');
   const [showAudit, setShowAudit] = useState(false);
+  /** What the manager clicked on the branch map: a prompt, a line, a stopped prompt, or a task. */
+  const [pick, setPick] = useState<Pick>(null);
   /** A rule the manager just changed, shown at once while the server catches up. */
   const [draft, setDraft] = useState<Settings | null>(null);
 
@@ -302,7 +454,7 @@ export function ManagerView() {
                   type="button"
                   className="mgr__member"
                   aria-pressed={m.id === member.id}
-                  onClick={() => setChosen(m.id)}
+                  onClick={() => (setChosen(m.id), setPick(null))}
                 >
                   <span className="mgr__name">
                     {m.name}
@@ -397,15 +549,30 @@ export function ManagerView() {
                 </span>
               </h3>
               <ul className="proj__tasks mgr__tasks">
-                {member.tasks.map((t) => (
-                  <li key={t.id} data-status={t.status}>
-                    <span className="proj__mark" aria-hidden="true">
-                      {t.status === 'done' && <Check />}
-                    </span>
-                    <span>{t.title}</span>
-                    {t.status === 'doing' && <em>In progress</em>}
-                  </li>
-                ))}
+                {member.tasks.map((t) => {
+                  const lines = member.branches?.lines.filter((l) => l.task === t.id) ?? [];
+                  const prompts = member.branches?.nodes.filter((n) => lines.some((l) => l.id === n.line)).length ?? 0;
+                  return (
+                    <li key={t.id} data-status={t.status}>
+                      <span className="proj__mark" aria-hidden="true">
+                        {t.status === 'done' && <Check />}
+                      </span>
+                      <button
+                        type="button"
+                        className="mgr__task"
+                        aria-pressed={pick?.kind === 'task' && pick.id === t.id}
+                        title="Show where this task is on the branch map"
+                        onClick={() => setPick(pick?.kind === 'task' && pick.id === t.id ? null : { kind: 'task', id: t.id })}
+                      >
+                        {t.title}
+                      </button>
+                      <em>
+                        {t.status === 'doing' ? 'In progress' : ''}
+                        {lines.length > 0 ? `${t.status === 'doing' ? ', ' : ''}${plural(prompts, 'prompt', 'prompts')}` : ''}
+                      </em>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           </div>
@@ -416,7 +583,26 @@ export function ManagerView() {
             </h3>
             {member.branches ? (
               <>
-                <BranchMap shape={member.branches} size="small" />
+                <BranchMap
+                  shape={member.branches}
+                  size="small"
+                  picked={pick?.kind === 'node' ? pick.i : null}
+                  onPick={(i) => setPick(i === null ? null : { kind: 'node', i })}
+                  describe={(i) => `Prompt ${i + 1}`}
+                  pickedStop={pick?.kind === 'stop' ? pick.k : null}
+                  onPickStop={(k) => setPick(k === null ? null : { kind: 'stop', k })}
+                  onPickLine={(id) => setPick(pick?.kind === 'line' && pick.id === id ? null : { kind: 'line', id })}
+                  focus={
+                    pick?.kind === 'line'
+                      ? [pick.id]
+                      : pick?.kind === 'task'
+                        ? member.branches.lines.filter((l) => l.task === pick.id).map((l) => l.id)
+                        : pick?.kind === 'node'
+                          ? [member.branches.nodes[pick.i]?.line ?? '']
+                          : undefined
+                  }
+                />
+                <Detail pick={pick} shape={member.branches} tasks={member.tasks} first={first ?? ''} onPick={setPick} />
                 <p className="mgr__empty">
                   {describe(member.branches)} A dot is a prompt, a number marks coming back to a line, and a red dead
                   end is a prompt that was stopped. Each line is named by the part of the project it is on. What{' '}
@@ -427,6 +613,36 @@ export function ManagerView() {
               <p className="mgr__empty">No branch map yet. It appears once {first}'s workspace is open.</p>
             )}
           </div>
+        </section>
+
+        <section aria-labelledby="ways">
+          <h2 id="ways">
+            How the team works <span>the steps people took and what they reused. Layers offers these to teammates</span>
+          </h2>
+          <ul className="mgr__ways">
+            {data.processes.map((p, i) => (
+              <li key={`${p.who}-${p.project}-${i}`}>
+                <p>
+                  <b>{p.who}</b> on {p.project}
+                  <span className="mgr__tag" data-live={p.sample ? undefined : ''}>
+                    {p.sample ? 'Sample' : 'Live'}
+                  </span>
+                  <time>{p.when}</time>
+                </p>
+                <p className="mgr__empty">{p.did}.</p>
+                <p className="b-path">
+                  {p.path.map((step) => (
+                    <span key={step}>{step}</span>
+                  ))}
+                </p>
+                {p.workflow && (
+                  <p className="mgr__empty">
+                    Used <code>{p.workflow}</code>
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
         </section>
 
         <section aria-labelledby="audit">

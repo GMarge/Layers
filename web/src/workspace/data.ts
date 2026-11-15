@@ -1,4 +1,4 @@
-import type { KnowledgeItem, Message, Rule, Task } from '../layers/types';
+import type { KnowledgeItem, Message, Rule, Task, TeamProcess } from '../layers/types';
 
 /** Everything in this file is fictional seed data for the demo workspace. */
 
@@ -58,7 +58,42 @@ export const competitorMatrix: KnowledgeItem = {
   access: 'Shared with Strategy, interns included',
   columns: ['Company', 'Segment', 'Pricing model', 'Standout feature', 'Gap we can use'],
   inputs: 'A list of competitor names',
+  usedBy: [
+    { who: 'Ines Okafor', project: 'Project Z' },
+    { who: 'Marcus Bell', project: 'Vendor renewal' },
+  ],
 };
+
+/** How teammates did similar work. The same sample records the server holds. */
+export const teamProcesses: TeamProcess[] = [
+  {
+    who: 'Ines Okafor',
+    project: 'Project Z',
+    did: 'Laid competitor pricing pages side by side, tier by tier',
+    path: ['Pricing pages', 'Plan tiers', 'Comparison spreadsheet'],
+    workflow: 'CompetitorMatrix_v2',
+    when: '2 days ago',
+    sample: true,
+  },
+  {
+    who: 'Marcus Bell',
+    project: 'Project Y',
+    did: 'Turned twelve customer interviews into themes, then a synthesis draft',
+    path: ['Interview notes', 'Theme tagging', 'Synthesis draft'],
+    workflow: 'InterviewSynthesis_v1',
+    when: '3 days ago',
+    sample: true,
+  },
+  {
+    who: 'Elena Ruiz',
+    project: 'Loyalty study',
+    did: 'Built the readout presentation for the loyalty study from her findings',
+    path: ['Findings', 'Presentation outline', 'Readout'],
+    workflow: 'ReadoutOutline_v3',
+    when: '9 days ago',
+    sample: true,
+  },
+];
 
 export const readoutOutline: KnowledgeItem = {
   id: 'wf-readout-outline-v3',
@@ -72,6 +107,7 @@ export const readoutOutline: KnowledgeItem = {
   access: 'Shared with Strategy, interns included',
   columns: ['Section', 'Key point', 'Evidence to show', 'Owner'],
   inputs: "The project's findings",
+  usedBy: [{ who: 'Elena Ruiz', project: 'Loyalty study' }],
 };
 
 export const outlineSections = ['Why this matters', 'Who we compared', 'What we found', 'Gaps we can use', 'Recommendation'];

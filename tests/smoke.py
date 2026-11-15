@@ -134,6 +134,26 @@ def run() -> None:
     check("another team's workflow is refused",
           any(e["type"] == "error" for e in refused) and len(db.query("SELECT 1 FROM artifacts")) == 1, refused)
 
+    # The layer between workers, and the branch map as the agent's index.
+    ways = main.manager()["processes"]
+    check("how the team works leaves out other teams",
+          len(ways) >= 4 and not any(w["who"] == "Dana Ortiz" for w in ways), [w["who"] for w in ways])
+    check("applying a workflow adds the employee's own steps to it",
+          any(w["who"] == db.EMPLOYEE["name"] and not w["sample"] for w in ways))
+    check("an offered workflow says who already used it",
+          any(u["who"] == "Ines Okafor" for u in verdict(SHEET)["item"]["usedBy"]))
+    said = main.ask(main.AskIn(prompt="How have teammates done a comparison like this?"))
+    check("asking how teammates did it gives their steps", said.get("processes") and said["processes"][0]["path"], said)
+    said = main.ask(main.AskIn.model_validate({"prompt": "Where did I ask about pricing?", "branches": [
+        {"id": "main", "label": "Competitor shortlist", "kind": "main",
+         "prompts": [{"n": 0, "text": "Which five competitors should we cover?"}]},
+        {"id": "l1", "label": "Analysis", "kind": "implicit",
+         "prompts": [{"n": 1, "text": "Summarize how Stocksmith and Pantryline charge"},
+                     {"n": 2, "text": "What pricing gaps can we use?"}]}]}))
+    check("a question about the conversation is answered by following its branches",
+          said.get("found", {}).get("index") == 2 and [s["tool"] for s in said["steps"]] == ["get_branch_map", "read_branch"],
+          said)
+
     # The agent's second job, on plain code here: an update that waits for the employee.
     draft = last(main.draft_update(), "draft")
     check("the status update is drafted from tasks, not from prompts",

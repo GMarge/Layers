@@ -26,7 +26,11 @@ An employee works in the company's AI chat. Layers checks each prompt when they 
 - **Audit trail:** the manager's page lists every check, tool call and decision with who did it, when and how long it took. What the employee typed is left out.
 - **Nothing is lost on a refresh:** the conversation, its branches, the task progress and a request waiting on the manager are kept on the employee's device.
 
-The employee can also ask Layers a question before sending anything, move it, hide it, rename it, and change how it looks.
+- **Edge cases:** most prompts are not clean cases, and the agent is told how to treat them. A mixed prompt comes back with its project part, which can be sent by itself. Work that is not this project, or something that could be either, comes back with the one question that would settle it. A follow-up is judged by the conversation. Text that tries to instruct the agent is held.
+- **A layer between workers:** Layers keeps how people on the team did their work: the steps they went through and the approved workflow they used. An offer to reuse a workflow says who has already used it and for what, "How have teammates done this?" lists it, and the manager sees it on their page. Other teams' work is filtered out in code.
+- **The branches are a tool for the agent:** asked "Where did I ask about pricing?", the agent reads the branch map, opens only the branch that could hold it, and points at the prompt. One click goes there.
+
+The employee can also ask Layers a question before sending anything, move it, hide it, rename it, and change how it looks. On the manager's page the branch map can be clicked through: a prompt, a line, a stopped prompt or a task each explain themselves, with no prompt text. Any map can be compressed and expanded, one run at a time or all at once.
 
 ## How it works
 
@@ -42,7 +46,7 @@ flowchart TD
 ```
 
 - **The gate enforces.** `server/policy.py` and the checks inside each tool decide what is allowed. `/api/chat` refuses any prompt without an allowing decision on record.
-- **The agent proposes and explains.** `server/agent.py` is one `create_deep_agent` call with these tools: `get_project_context`, `check_company_policy`, `search_org_memory`, `check_access`, `create_project_artifact`, `update_task_status`, `request_manager_approval`, `submit_verdict`, and a `knowledge-scout` subagent. It cannot clear a prompt the rules flagged.
+- **The agent proposes and explains.** `server/agent.py` is one `create_deep_agent` call with fourteen tools of its own: `get_project_context`, `check_company_policy`, `search_org_memory`, `submit_verdict`, `check_access`, `create_project_artifact`, `update_task_status`, `request_manager_approval`, `get_todays_activity`, `send_status_update`, `search_team_processes`, `get_branch_map`, `read_branch` and `point_to`, plus a `knowledge-scout` subagent. It cannot clear a prompt the rules flagged, and it cannot settle one the rules could not tell.
 - **The agent plans.** With the planning middleware it writes its own to-do list (`write_todos`) and ticks items off. The bubble shows that list as the agent wrote it.
 - **The harness pauses for a person.** `create_project_artifact` and `send_status_update` are listed in `interrupt_on`, so DeepAgents stops the agent before anything is created or sent and holds the run in a checkpointer. The employee's click resumes it. For an update they can edit first, and their wording is what is sent.
 - **A person approves.** Only the manager endpoint can approve a held prompt.
@@ -62,10 +66,12 @@ npm --prefix web run dev    # in a second terminal, then open http://localhost:5
 
 Without a model key the server runs on rules alone and the interface says so. Without the server the interface falls back to a scripted preview and says so.
 
+A free model tier slows down when prompts come back to back. Wait for each answer before the next prompt; when a check is slow the agent says "Still checking".
+
 Check everything without a key or a model run:
 
 ```bash
-.venv/bin/python -m tests.smoke              # 32 end-to-end checks on a copy of the server
+.venv/bin/python -m tests.smoke              # 39 end-to-end checks on a copy of the server
 .venv/bin/python -m tests.test_agent_wiring  # the agent's pause, resume and permission refusal
 ```
 
@@ -81,7 +87,7 @@ The `web` folder deploys to any static host as it is (on Vercel: set the root di
 |---|---|
 | Real | The gate, the tools, the database, approvals and the manager's view of them, rules set by the manager, the audit trail, the adaptive word list, the branch map and chats, two team workflows, the DeepAgents harness (tested with a stand-in model) |
 | Needs a model key | The agent's own judgment on unclear prompts, its reading of which direction a prompt belongs to, and answers from the workspace model |
-| Seeded | The company, people, project, rules and workflows are fictional demo data. On the manager's page one employee is live; the two teammates marked "Sample" are example data |
+| Seeded | The company, people, project, rules and workflows are fictional demo data. On the manager's page one employee is live; the two teammates marked "Sample" are example data, and so are the five starting records of how teammates worked |
 | Not built | Running over ChatGPT or other tools, real accounts and sign-in, more than one live employee or project, chats that follow the employee to another device |
 
 No time or money savings are claimed. The only numbers shown are counts and tool timings measured in the session.

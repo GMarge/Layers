@@ -70,7 +70,7 @@ const service: LayersService = {
     );
   },
 
-  ask: (question) => post<AskAnswer>('ask', { prompt: question }),
+  ask: (question, branches) => post<AskAnswer>('ask', { prompt: question, branches }),
   requestApproval: (prompt, note) => post('approvals', { prompt, note: note ?? '' }),
 
   async recordFeedback(kind, prompt, note) {

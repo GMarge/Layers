@@ -30,11 +30,12 @@ CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 URL = os.environ.get("LAYERS_SHOTS_URL", "http://127.0.0.1:5174/")
 OUT = Path(__file__).resolve().parent.parent / "docs" / "shots"
 PORT = 9333
+PACE = float(os.environ.get("LAYERS_SHOTS_PACE", "9"))  # seconds between steps
 
 HELPERS = """
 window.L = {
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
-  until: async (fn, what, ms = 90000) => {
+  until: async (fn, what, ms = 240000) => {
     const start = Date.now();
     for (;;) {
       const value = fn();
@@ -49,6 +50,13 @@ window.L = {
     box.dispatchEvent(new Event('input', { bubbles: true }));
     await L.sleep(150);
     document.querySelector('.composer__send').click();
+  },
+  ask: async (text) => {
+    const box = await L.until(() => document.querySelector('.b-ask input'), 'the ask box', 15000);
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(box, text);
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    await L.sleep(150);
+    box.form.requestSubmit();
   },
   answers: () => document.querySelectorAll('.msg--ai').length,
   title: () => document.querySelector('.bubble .b-title')?.textContent ?? '',
@@ -84,6 +92,8 @@ async def session(ws) -> None:
         picture = await call("Page.captureScreenshot", format="jpeg", quality=90)
         (OUT / f"{name}.jpg").write_bytes(base64.b64decode(picture["data"]))
         print("saved", name, flush=True)
+        # A free model tier throttles when prompts come back to back, so leave a gap after each step.
+        await asyncio.sleep(PACE)
 
     await call("Page.enable")
     await call("Emulation.setDeviceMetricsOverride", width=1440, height=900, deviceScaleFactor=2, mobile=False)
@@ -101,6 +111,16 @@ async def session(ws) -> None:
 
     await js("""const n = L.answers(); await L.send('Summarize how Stocksmith and Pantryline price their plans');
                 await L.until(() => L.answers() > n, 'the first answer');""")
+
+    await js("""document.querySelector('.views__try').click(); await L.sleep(250);
+                await L.click('.views__menu', 'Ask Layers');
+                await L.ask('Where did I ask about pricing?');
+                await L.until(() => L.button('.bubble', 'Go to it'), 'the prompt it found');""")
+    await shot("15-finds-it-by-following-the-branches")
+    await js("""await L.ask('How have teammates done this?');
+                await L.until(() => document.querySelector('.b-procs'), 'how teammates did it');""")
+    await shot("16-how-teammates-did-it")
+    await js("document.querySelector('.bubble__close')?.click(); await L.sleep(900);")
 
     await js("""await L.send('Plan my ski vacation this weekend');
                 await L.until(() => L.title().includes('unrelated'), 'the hold');
@@ -167,6 +187,12 @@ async def session(ws) -> None:
     await js("""document.querySelector('.mgr__more').click(); await L.sleep(300);
                 document.querySelector('.mgr').scrollTo(0, document.getElementById('audit').offsetTop - 84);""")
     await shot("13-audit-trail")
+    await js("""const mgr = document.querySelector('.mgr');
+                mgr.scrollTo(0, document.getElementById('person').offsetTop - 84); await L.sleep(300);
+                const names = [...document.querySelectorAll('.bmap__names button')];
+                (names.find((b) => b.textContent.includes('Analysis')) ?? names[0]).click(); await L.sleep(400);
+                mgr.scrollTo(0, document.querySelector('.bmap').getBoundingClientRect().top + mgr.scrollTop - 300);""")
+    await shot("17-manager-clicks-a-line")
 
     await js("location.hash = '#both'; await L.sleep(3500);")
     await shot("14-side-by-side", 1.0)

@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS feedback (
   id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT, prompt TEXT, created_at REAL
 );
 CREATE TABLE IF NOT EXISTS learned_terms (term TEXT PRIMARY KEY, learned_from TEXT, created_at REAL);
+CREATE TABLE IF NOT EXISTS processes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, person TEXT, team TEXT, project TEXT, workflow_id TEXT,
+  did TEXT, path TEXT, created_at REAL, sample INTEGER
+);
 CREATE TABLE IF NOT EXISTS updates (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, created_at REAL);
 CREATE TABLE IF NOT EXISTS audit (
   id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, actor TEXT, action TEXT, detail TEXT
@@ -51,7 +55,7 @@ CREATE TABLE IF NOT EXISTS audit (
 """
 
 TABLES = ["settings", "tasks", "rules", "workflows", "artifacts", "approvals", "decisions",
-          "feedback", "learned_terms", "updates", "audit"]
+          "feedback", "learned_terms", "processes", "updates", "audit"]
 
 
 def execute(sql: str, params: tuple = ()) -> sqlite3.Cursor:
@@ -138,6 +142,28 @@ def reset() -> None:
              json.dumps({"task": "t2", "title": "interview themes", "noun": "Theme sheet",
                          "rows": ["Theme 1", "Theme 2", "Theme 3"]})),
         ])
+        # How teammates have done similar work: the steps they went through and the workflow
+        # they used. Sample data, so the layer between workers has something in it on day one.
+        day = 86400
+        _conn.executemany(
+            "INSERT INTO processes (person, team, project, workflow_id, did, path, created_at, sample) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 1)", [
+                ("Ines Okafor", "Strategy", "Project Z", "wf-competitor-matrix-v2",
+                 "Laid competitor pricing pages side by side, tier by tier",
+                 json.dumps(["Pricing pages", "Plan tiers", "Comparison spreadsheet"]), time.time() - 2 * day),
+                ("Marcus Bell", "Strategy", "Project Y", "wf-interview-synth",
+                 "Turned twelve customer interviews into themes, then a synthesis draft",
+                 json.dumps(["Interview notes", "Theme tagging", "Synthesis draft"]), time.time() - 3 * day),
+                ("Elena Ruiz", "Strategy", "Loyalty study", "wf-readout-outline-v3",
+                 "Built the readout presentation for the loyalty study from her findings",
+                 json.dumps(["Findings", "Presentation outline", "Readout"]), time.time() - 9 * day),
+                ("Marcus Bell", "Strategy", "Vendor renewal", "wf-competitor-matrix-v2",
+                 "Compared six point-of-sale vendors side by side before a renewal",
+                 json.dumps(["Vendor shortlist", "Comparison spreadsheet", "Recommendation"]), time.time() - 12 * day),
+                ("Dana Ortiz", "Finance", "Q3 close", "wf-board-deck-q3",
+                 "Assembled the quarterly board deck",
+                 json.dumps(["Figures", "Board deck"]), time.time() - 20 * day),
+            ])
         _conn.commit()
 
 
@@ -145,5 +171,5 @@ with _lock:
     _conn.executescript(SCHEMA)
 # A database from before a table gained a column is rebuilt, so the server always starts.
 _current = "plan" in [c["name"] for c in query("PRAGMA table_info(workflows)")]
-if not _current or not query("SELECT 1 FROM tasks LIMIT 1"):
+if not _current or not query("SELECT 1 FROM tasks LIMIT 1") or not query("SELECT 1 FROM processes LIMIT 1"):
     reset()

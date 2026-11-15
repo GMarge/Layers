@@ -400,8 +400,7 @@ export function Workspace(p: Props) {
             </span>
           </p>
           <p className="side__fine">
-            {p.status} Demo workspace: the company, people and data are fictional. Your chats are kept on this
-            device.{' '}
+            {p.status} The company, people and data are made up. Chats are kept on this device.{' '}
             <button type="button" onClick={p.onReset}>
               Start over
             </button>

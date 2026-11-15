@@ -3,7 +3,7 @@ import { ArrowUp, Check, Close } from '../ui/icons';
 import { manager, project, rules } from '../workspace/data';
 import { DEFAULT_NAME, type EyeStyle, type OutlineStyle } from './prefs';
 import { MascotGlyph, SHAPES, type Shape } from './Mascot';
-import type { Counters, KnowledgeItem, PolicyMode, RestMode, Scene, Signals, Step, Todo, UnsureMode } from './types';
+import type { Counters, KnowledgeItem, PolicyMode, RestMode, Scene, Signals, Step, TeamProcess, Todo, UnsureMode } from './types';
 
 export type BubblePlacement = 'right' | 'above';
 
@@ -43,6 +43,8 @@ export interface BubbleActions {
   sendWithNote(note: string): void;
   /** Send only the project part of a mixed prompt, and set the whole draft aside. */
   sendTrimmed(): void;
+  /** Open the chat a prompt is in and bring that prompt into view. */
+  goTo(index: number): void;
   openSettings(): void;
   /** Fold a direction Layers split off back into the main line. */
   mergeBranch(lineId: string): void;
@@ -79,7 +81,12 @@ interface Context {
   a: BubbleActions;
 }
 
-const SUGGESTIONS = ['What are my limits here?', 'Can I plan personal travel?', 'Has my team built a competitor matrix?'];
+const SUGGESTIONS = [
+  'What are my limits here?',
+  'Has my team built a competitor matrix?',
+  'How have teammates done this?',
+  'Where did I ask about pricing?',
+];
 
 /** A scene is a chip when it only needs one line. */
 export function isCompact(scene: Scene): boolean {
@@ -200,8 +207,37 @@ function ItemCard({ item }: { item: KnowledgeItem }) {
       <p className="b-text">{item.summary}</p>
       <p className="b-fine">
         By {item.author}, {item.team}. Reviewed {item.reviewedOn}. You have access.
+        {item.usedBy && item.usedBy.length > 0 && (
+          <> Already used by {item.usedBy.map((u) => `${u.who} on ${u.project}`).join(' and ')}.</>
+        )}
       </p>
     </div>
+  );
+}
+
+/** How teammates did similar work: who, on what, the steps they took and what they used. */
+function ProcessList({ processes }: { processes: TeamProcess[] }) {
+  return (
+    <ul className="b-procs">
+      {processes.map((p) => (
+        <li key={`${p.who}-${p.project}`}>
+          <p>
+            <b>{p.who}</b> on {p.project}, {p.when}
+          </p>
+          <p className="b-fine">{p.did}.</p>
+          <p className="b-path">
+            {p.path.map((step) => (
+              <span key={step}>{step}</span>
+            ))}
+          </p>
+          {p.workflow && (
+            <p className="b-fine">
+              Used <code>{p.workflow}</code>
+            </p>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -366,6 +402,16 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
                 </p>
               )}
               {ans?.showLimits && <RuleList />}
+              {ans?.found && (
+                <div className="b-item">
+                  <p className="b-item__name">
+                    <span className="b-tag">{ans.found.label}</span>
+                    <span className="b-fine">prompt {ans.found.index + 1}</span>
+                  </p>
+                  <p className="b-text">{ans.found.prompt}</p>
+                </div>
+              )}
+              {ans?.processes && <ProcessList processes={ans.processes} />}
               {ans?.item && <ItemCard item={ans.item} />}
               {ans?.requested && (
                 <p className="b-fine">
@@ -402,6 +448,13 @@ function viewFor(scene: Scene, { prefs, counters, hasDraft, a }: Context): View 
                 </span>
               </p>
             </div>
+            {ans?.found && (
+              <div className="b-actions">
+                <Act primary onClick={() => a.goTo(ans.found!.index)}>
+                  Go to it
+                </Act>
+              </div>
+            )}
             {ans?.item && (
               <div className="b-actions">
                 <Act primary onClick={a.useFromAsk}>

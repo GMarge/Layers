@@ -54,6 +54,8 @@ TOPIC_LABELS = {"research": "Competitor research", "analysis": "Analysis",
 
 
 TOPIC_IDS = {label.lower(): key for key, label in TOPIC_LABELS.items()}
+# The project task each area of the conversation works towards.
+TOPIC_TASKS = {"research": "t1", "analysis": "t2", "sheet": "t3", "deck": "t4"}
 
 
 def clean_label(text: str) -> str:
@@ -123,6 +125,24 @@ class PreflightIn(PromptIn):
     others: list[str] = Field(default_factory=list, max_length=12)
 
 
+class BranchPromptIn(BaseModel):
+    n: int = Field(ge=0, le=2000)
+    text: str = Field(max_length=300)
+
+
+class BranchIn(BaseModel):
+    """One branch of the employee's own conversation, sent with a question so their agent can
+    look through it. It is used for that one answer and not kept."""
+    id: str = Field(pattern=r"^[a-z0-9]{1,12}$")
+    label: str = Field(max_length=60)
+    kind: Literal["main", "implicit", "explicit"]
+    prompts: list[BranchPromptIn] = Field(max_length=80)
+
+
+class AskIn(PromptIn):
+    branches: list[BranchIn] | None = Field(default=None, max_length=40)
+
+
 class Turn(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(max_length=6000)
@@ -183,6 +203,7 @@ class NodeIn(BaseModel):
     line: str = Field(pattern=LINE_ID)
     reopened: bool = False
     visit: int = Field(default=1, ge=1, le=99)
+    at: float | None = None  # when it was sent
 
 
 class StopIn(BaseModel):
@@ -190,6 +211,8 @@ class StopIn(BaseModel):
     line: str = Field(pattern=LINE_ID)
     after: int = Field(default=0, ge=-1, le=2000)
     state: Literal["held", "waiting", "declined"] = "held"
+    why: Literal["policy", "unsure"] = "policy"
+    at: float | None = None
 
 
 class BranchesIn(BaseModel):
@@ -467,6 +490,7 @@ def apply(body: ApplyIn):
 @app.post("/api/undo")
 def undo(body: UndoIn):
     db.execute("DELETE FROM artifacts WHERE id = ?", (body.artifact_id,))
+    db.execute("DELETE FROM processes WHERE id = (SELECT MAX(id) FROM processes WHERE sample = 0)")
     db.execute("UPDATE tasks SET status = 'todo' WHERE id = ?", (body.task_id,))
     db.audit(db.EMPLOYEE["name"], "undo", body.model_dump())
     return {"ok": True}
@@ -577,16 +601,86 @@ def send_update(body: SendUpdateIn):
     return stream(work)
 
 
+FIND_WORDS = ("where did", "where is", "where was", "where were", "find ", "which chat", "which branch",
+              "did i ask", "did i already", "when did i", "look for", "locate")
+TEAM_WORDS = ("who else", "teammate", "anyone else", "how did", "how have", "how has", "colleague",
+              "other people", "someone else", "others")
+SKIP_WORDS = {"where", "find", "asked", "about", "talk", "talked", "chat", "branch", "which", "when", "have",
+              "that", "this", "with", "what", "locate", "look", "already", "thing", "something"}
+
+
+def plain_find(question: str, branches: list[dict]) -> dict | None:
+    """Find a prompt by following the branches, in plain code: pick the branch whose prompts share
+    the most words with the question, then the prompt in it that shares the most."""
+    words = [w[:6] for w in re.findall(r"[a-z]{4,}", question.lower()) if w not in SKIP_WORDS]
+    if not words or not branches:
+        return None
+    tools.get_branch_map()
+
+    def score(text: str) -> int:
+        return sum(1 for w in words if w in text.lower())
+
+    best = max(branches, key=lambda b: score(b["label"]) * 2 + max((score(p["text"]) for p in b["prompts"]), default=0))
+    hit = max(best["prompts"], key=lambda p: score(p["text"]), default=None)
+    if not hit or score(hit["text"]) + score(best["label"]) == 0:
+        return None
+    tools.read_branch(best["label"])
+    return {"line": best["id"], "index": hit["n"], "label": best["label"], "prompt": hit["text"], "what": ""}
+
+
 @app.post("/api/ask")
-def ask(body: PromptIn):
+def ask(body: AskIn):
     """A question to Layers itself. Nothing here goes to the workspace model."""
     question = body.prompt.strip()
     low = question.lower()
     screen = policy.screen(question)
     answer: dict
-    tools.start_run(None)
+    steps: list[dict] = []  # each tool call made for this answer, so the employee can see them
+    by = "code"
+
+    def keep(event):
+        if event["type"] == "step" and event["step"]["status"] != "running":
+            steps.append(event["step"])
+
+    tools.start_run(keep)
     try:
-        if any(w in low for w in ("limit", "allowed", "rule", "policy", "what can i")):
+        if body.branches and any(w in low for w in FIND_WORDS):
+            # The branches are the index. The agent reads the map, opens only the branch that
+            # could hold the answer, and points at the prompt.
+            branches = [b.model_dump() for b in body.branches]
+            tools._scratch["branches"] = branches
+            found = None
+            supervisor = agent.get()
+            if supervisor:
+                try:
+                    agent.run(supervisor, "FIND: the employee asks where this is in their conversation: "
+                                          f"<question>{question}</question>")
+                    found = tools._scratch.get("found")
+                    by = "agent"
+                except Exception as exc:
+                    db.audit("server", "agent_failed", str(exc))
+                tools._scratch["branches"] = branches
+            found = found or plain_find(question, branches)
+            if found:
+                answer = {"text": found["what"] or f"It is in {found['label']}, prompt {found['index'] + 1}.",
+                          "found": {k: found[k] for k in ("line", "index", "label", "prompt")}}
+            else:
+                answer = {"text": "I followed the branches of this conversation and could not find that."}
+        elif any(w in low for w in TEAM_WORDS):
+            # The layer between workers: how people on the same team did similar work.
+            found = json.loads(tools.search_team_processes(question)) or tools.team_processes()[:3]
+            found = [p for p in found if p["who"] != db.EMPLOYEE["name"]]
+            if found:
+                found = found[:2]  # the two closest fit in the bubble; the manager's page has them all
+                names = list(dict.fromkeys(p["who"].split()[0] for p in found))
+                answer = {"text": f"{' and '.join(names)} on your team {'has' if len(names) == 1 else 'have'} "
+                                  "done work like this. Here is how.", "processes": found}
+                used = tools._workflow_row(found[0]["workflow_id"]) if found[0]["workflow_id"] else None
+                if used and tools._can_use(used):
+                    answer["item"] = tools.workflow_public(used)
+            else:
+                answer = {"text": "Nobody on your team has done work like that through Layers yet."}
+        elif any(w in low for w in ("limit", "allowed", "rule", "policy", "what can i")):
             answer = {"text": f"Two rules apply to you in this workspace. Anything tied to "
                               f"{db.PROJECT['name']} goes straight through.", "showLimits": True}
         elif any(w in low for w in ("built", "already", "existing", "template", "workflow", "matrix",
@@ -615,7 +709,7 @@ def ask(body: PromptIn):
     finally:
         tools.end_run()
     db.audit(db.EMPLOYEE["name"], "ask", {"question": question[:200], "answer": answer["text"][:200]})
-    return answer
+    return {**answer, "steps": steps, "by": by}
 
 
 @app.post("/api/approvals")
@@ -720,6 +814,7 @@ def branches(body: BranchesIn):
     shape = {
         "lines": [{"id": line.id, "kind": line.kind, "parent": line.parent, "fork": line.fork,
                    "label": TOPIC_LABELS.get(line.topic or "", "Other direction" if line.topic else "New branch"),
+                   "task": TOPIC_TASKS.get(line.topic or ""),
                    "merged": line.merged, "promoted": line.promoted} for line in body.lines],
         "nodes": [node.model_dump() for node in body.nodes],
         "active": body.active,
@@ -860,6 +955,7 @@ def manager():
         "pending": pending, "feed": feed[:12], "tasks": tasks, "counts": counts,
         "team": [live, *SAMPLE_TEAM],
         "settings": company_settings(),
+        "processes": tools.team_processes(),
         "rules": db.query("SELECT id, name, text FROM rules"),
         "audit": audit_trail(),
     }
