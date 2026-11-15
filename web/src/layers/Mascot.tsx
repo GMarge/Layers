@@ -143,10 +143,18 @@ export function Mascot(props: Props) {
     };
   }, [followPointer]);
 
+  // The drag listens on the whole window, not just the agent, so letting go is never missed:
+  // not when the pointer outruns him, not when he changes shape under it.
+  const live = useRef({ onDrag: props.onDrag, onDrop: props.onDrop });
+  live.current = { onDrag: props.onDrag, onDrop: props.onDrop };
+  const stopDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopDrag.current?.(), []);
+
   const onPointerDown = (e: ReactPointerEvent<HTMLButtonElement>) => {
     if (!draggable || e.button !== 0) return;
+    stopDrag.current?.();
     const r = e.currentTarget.getBoundingClientRect();
-    press.current = {
+    const p = {
       id: e.pointerId,
       x: e.clientX,
       y: e.clientY,
@@ -154,28 +162,49 @@ export function Mascot(props: Props) {
       dy: e.clientY - (r.top + r.height / 2),
       dragging: false,
     };
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch {
-      // Capture is a nicety: without it the drag still works while the pointer stays over the agent.
-    }
-  };
+    press.current = p;
 
-  const onPointerMove = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const p = press.current;
-    if (!p || p.id !== e.pointerId) return;
-    if (!p.dragging && Math.hypot(e.clientX - p.x, e.clientY - p.y) < TAP_SLOP) return;
-    p.dragging = true;
-    props.onDrag({ x: e.clientX - p.dx, y: e.clientY - p.dy });
-  };
-
-  const onPointerEnd = (e: ReactPointerEvent<HTMLButtonElement>) => {
-    const p = press.current;
-    if (!p || p.id !== e.pointerId) return;
-    press.current = null;
-    if (!p.dragging) return;
-    suppressClick.current = true;
-    props.onDrop({ x: e.clientX - p.dx, y: e.clientY - p.dy });
+    const finish = (x: number, y: number) => {
+      stop();
+      if (!p.dragging) return;
+      suppressClick.current = true;
+      // A click can follow a drag. Stop swallowing it shortly after, in case none comes.
+      setTimeout(() => (suppressClick.current = false), 250);
+      live.current.onDrop({ x: x - p.dx, y: y - p.dy });
+    };
+    const onMove = (ev: PointerEvent) => {
+      if (ev.pointerId !== p.id) return;
+      // The button is no longer down: the release happened somewhere it could not be seen.
+      if (ev.pointerType === 'mouse' && ev.buttons === 0) {
+        finish(ev.clientX, ev.clientY);
+        return;
+      }
+      if (!p.dragging && Math.hypot(ev.clientX - p.x, ev.clientY - p.y) < TAP_SLOP) return;
+      p.dragging = true;
+      live.current.onDrag({ x: ev.clientX - p.dx, y: ev.clientY - p.dy });
+    };
+    const onUp = (ev: PointerEvent) => {
+      if (ev.pointerId === p.id) finish(ev.clientX, ev.clientY);
+    };
+    const onLeave = () => finish(p.x, p.y);
+    const onKey = (ev: KeyboardEvent) => {
+      if (ev.key === 'Escape') finish(p.x, p.y);
+    };
+    const stop = () => {
+      press.current = null;
+      stopDrag.current = null;
+      window.removeEventListener('pointermove', onMove, true);
+      window.removeEventListener('pointerup', onUp, true);
+      window.removeEventListener('pointercancel', onUp, true);
+      window.removeEventListener('blur', onLeave);
+      window.removeEventListener('keydown', onKey, true);
+    };
+    window.addEventListener('pointermove', onMove, true);
+    window.addEventListener('pointerup', onUp, true);
+    window.addEventListener('pointercancel', onUp, true);
+    window.addEventListener('blur', onLeave);
+    window.addEventListener('keydown', onKey, true);
+    stopDrag.current = stop;
   };
 
   const onClick = () => {
@@ -203,9 +232,6 @@ export function Mascot(props: Props) {
       tabIndex={shown === 'gone' ? -1 : undefined}
       onClick={onClick}
       onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerEnd}
-      onPointerCancel={onPointerEnd}
     >
       {/* Liquid layer: a pool on the edge of the chat box and a blob that merges with it.
           The filter fuses the two so they pull together like surface tension. */}
