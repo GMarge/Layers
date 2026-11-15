@@ -12,6 +12,9 @@ from deepagents import create_deep_agent
 from . import db, tools
 
 MODEL = os.environ.get("LAYERS_MODEL", "").strip()
+# Paid providers are refused unless this is switched on deliberately.
+if MODEL and not MODEL.startswith("google_genai:") and os.environ.get("LAYERS_ALLOW_PAID") != "yes":
+    MODEL = ""
 
 SYSTEM_PROMPT = f"""You are Layers, the management layer on a company's AI workspace.
 
@@ -80,8 +83,24 @@ def status() -> dict:
     return {"agent": agent is not None, "model": MODEL or None, "error": _error or None}
 
 
+# Safety cap so a free key is never pushed hard. Each run makes a handful of model calls.
+DAILY_RUN_CAP = int(os.environ.get("LAYERS_DAILY_RUN_CAP", "60"))
+
+
+def spend_run() -> None:
+    """Count one model run against today's cap. Raises when the cap is reached."""
+    import datetime
+
+    key = f"runs:{datetime.date.today().isoformat()}"
+    used = int(db.setting(key) or 0)
+    if used >= DAILY_RUN_CAP:
+        raise RuntimeError("Daily model cap reached. Layers is on rules only until tomorrow.")
+    db.execute("INSERT OR REPLACE INTO settings VALUES (?, ?)", (key, str(used + 1)))
+
+
 def run(agent, task: str) -> str:
     """Run the agent on one task and return its final words."""
+    spend_run()
     result = agent.invoke({"messages": [{"role": "user", "content": task}]}, {"recursion_limit": 40})
     last = result["messages"][-1]
     content = getattr(last, "content", "")
