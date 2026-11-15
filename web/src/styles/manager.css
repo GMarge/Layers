@@ -687,6 +687,24 @@
   transform: translateX(-50%);
 }
 
+/* Coming out of the idle screen, the bar pops in once the page has settled. */
+.views[data-pop] {
+  animation: views-pop 460ms var(--ease-out) 280ms both;
+}
+
+@keyframes views-pop {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-16px) scale(0.86);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .views[data-pop] {
+    animation: none;
+  }
+}
+
 .views a {
   padding: 5px 12px;
   border-radius: 9px;

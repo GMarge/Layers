@@ -1,21 +1,24 @@
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { EdgeGlow, type GlowMode } from '../layers/EdgeGlow';
 import { MascotGlyph } from '../layers/Mascot';
 
 /**
  * The screen to leave up between demos. It shows how a prompt moves through Layers, one
  * example at a time, and has one button to start the live demo.
+ *
+ * The path is drawn the way the product draws a conversation: dots on a line, and a red
+ * dead end where a prompt was stopped.
  */
 
 type Tone = 'go' | 'stop' | 'ask';
 type StageId = 'send' | 'gate' | 'agent' | 'person' | 'work';
 
-const STAGES: { id: StageId; name: string; kind: string; does: string }[] = [
-  { id: 'send', name: 'You press Send', kind: 'The employee', does: 'Layers reads a prompt at this moment, and at no other.' },
-  { id: 'gate', name: 'The gate', kind: 'Plain code', does: 'Decides what may be sent. No model can overrule it.' },
-  { id: 'agent', name: 'The agent', kind: 'A LangChain DeepAgent', does: 'Looks when the gate cannot tell. It plans, uses its tools and remembers.' },
-  { id: 'person', name: 'A person', kind: 'You, or your manager', does: 'Approves anything the agent wants to create or send.' },
-  { id: 'work', name: 'The work', kind: 'The workspace model', does: 'The answer, or the document, lands in the project.' },
+const STAGES: { id: StageId; name: string; does: string }[] = [
+  { id: 'send', name: 'You press Send', does: 'Layers reads a prompt at this moment, and at no other.' },
+  { id: 'gate', name: 'The gate', does: 'Plain code. It decides what may be sent, and no model can overrule it.' },
+  { id: 'agent', name: 'The agent', does: 'A LangChain DeepAgent. It looks when the gate cannot tell, with a plan and tools.' },
+  { id: 'person', name: 'A person', does: 'You or your manager approve anything the agent wants to create or send.' },
+  { id: 'work', name: 'The work', does: 'The answer, or the document, lands in the project.' },
 ];
 
 interface Story {
@@ -72,21 +75,44 @@ const STORIES: Story[] = [
   },
 ];
 
+/** Timing, in milliseconds: the wait before the first stage, the gap between stages, and how long the result stays up. */
+const FIRST = 700;
+const EACH = 750;
+const HOLD = 3600;
+/** The line takes this long to cross a stage it does not stop at, and this long to arrive. */
+const HOP = 160;
+const DRAW = 300;
+
 export function Intro() {
   const [at, setAt] = useState(0);
   /** How many stages of this example's path have lit up so far. */
   const [step, setStep] = useState(0);
+  /**
+   * Whether the Layers server is answering. Without it the workspace runs its scripted preview,
+   * and the button says so. The first guess is by address, so the label does not flicker.
+   */
+  const [live, setLive] = useState(() => /^(localhost|127\.0\.0\.1|\[::1\])$/.test(window.location.hostname));
   const story = STORIES[at]!;
-  const path = STAGES.filter((s) => story.path[s.id]);
+  /** The stages on this example's path, as positions along the line. */
+  const stops = STAGES.flatMap((stage, i) => (story.path[stage.id] ? [i] : []));
+  const reached = step > 0 ? stops[step - 1]! : -1;
+  const before = step > 1 ? stops[step - 2]! : -1;
+  const total = FIRST + stops.length * EACH + HOLD;
+  const done = step >= stops.length;
+
+  /** Both at once, so a new example never shows a frame of the last one's lights. */
+  const show = (i: number) => {
+    setStep(0);
+    setAt((i + STORIES.length) % STORIES.length);
+  };
 
   useEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setStep(path.length);
+      setStep(stops.length);
       return;
     }
-    setStep(0);
-    const timers = path.map((_, i) => window.setTimeout(() => setStep(i + 1), 700 + i * 750));
-    const next = window.setTimeout(() => setAt((a) => (a + 1) % STORIES.length), 700 + path.length * 750 + 3600);
+    const timers = stops.map((_, i) => window.setTimeout(() => setStep(i + 1), FIRST + i * EACH));
+    const next = window.setTimeout(() => show(at + 1), total);
     return () => {
       timers.forEach(clearTimeout);
       clearTimeout(next);
@@ -94,7 +120,32 @@ export function Intro() {
     // One run per example. The path is fixed by the example.
   }, [at]);
 
-  const done = step >= path.length;
+  useEffect(() => {
+    let here = true;
+    fetch('/api/health')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((health: { ok?: boolean } | null) => here && setLive(health?.ok === true))
+      .catch(() => here && setLive(false));
+    return () => {
+      here = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const on = e.target as HTMLElement | null;
+      if (e.key === 'Enter' && !on?.closest?.('a, button')) window.location.hash = '';
+      else if (e.key === 'ArrowRight') show(at + 1);
+      else if (e.key === 'ArrowLeft') show(at - 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [at]);
+
+  /** A stage the line is only now arriving at waits for the line to get there. */
+  const arriving = (j: number) => j > before && j <= reached;
+  const wait = (j: number) => (arriving(j) ? (j - before - 1) * HOP : 0);
 
   return (
     <div className="root">
@@ -114,18 +165,35 @@ export function Intro() {
         </header>
 
         <section className="intro__flow" aria-label="How a prompt moves through Layers">
-          <p className="intro__prompt" key={at}>
-            <span>Someone types</span>
-            {story.prompt}
-          </p>
+          <div className="intro__box" data-sent={step > 0 ? '' : undefined}>
+            <p className="intro__prompt" key={at}>
+              {story.prompt}
+            </p>
+            <span className="intro__send" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 16 16">
+                <path d="M8 13V3.5M3.8 7.4 8 3.2l4.2 4.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </span>
+          </div>
 
-          <ol className="intro__stages">
-            {STAGES.map((stage) => {
+          <ol className="intro__track" key={at}>
+            {STAGES.map((stage, j) => {
               const tone = story.path[stage.id];
-              const on = !!tone && path.findIndex((s) => s.id === stage.id) < step;
+              const on = !!tone && j <= reached;
+              const timing = {
+                '--line-d': `${wait(j + 1)}ms`,
+                '--node-d': `${j > 0 && arriving(j) ? wait(j) + DRAW : 0}ms`,
+              } as CSSProperties;
               return (
-                <li key={stage.id} data-tone={on ? tone : undefined} data-skip={tone ? undefined : ''}>
-                  <p className="intro__kind">{stage.kind}</p>
+                <li
+                  key={stage.id}
+                  data-tone={on ? tone : undefined}
+                  data-pass={!tone && j < reached ? '' : undefined}
+                  data-skip={tone ? undefined : ''}
+                  data-out={j < reached ? '' : undefined}
+                  style={timing}
+                >
+                  <span className="intro__node" aria-hidden="true" />
                   <h2>{stage.name}</h2>
                   <p className="intro__does">{stage.does}</p>
                   <p className="intro__says">{on ? story.says[stage.id] : ''}</p>
@@ -134,13 +202,13 @@ export function Intro() {
             })}
           </ol>
 
-          <p className="intro__line" data-on={done ? '' : undefined}>
+          <p className="intro__line" key={`line-${at}`} data-on={done ? '' : undefined}>
             {story.line}
           </p>
 
-          <div className="intro__dots" role="group" aria-label="Examples">
+          <div className="intro__picks" role="group" aria-label="Examples" style={{ '--dur': `${total}ms` } as CSSProperties}>
             {STORIES.map((s, i) => (
-              <button key={s.prompt} type="button" aria-pressed={i === at} aria-label={`Example ${i + 1}: ${s.prompt}`} onClick={() => setAt(i)} />
+              <button key={s.prompt} type="button" aria-pressed={i === at} aria-label={`Example ${i + 1}: ${s.prompt}`} onClick={() => show(i)} />
             ))}
           </div>
         </section>
@@ -148,25 +216,24 @@ export function Intro() {
         <section className="intro__memory" aria-label="What it remembers">
           <ul>
             <li>
-              <b>The conversation, as a map.</b> Every prompt is a dot on a branch. A question already asked is pointed
-              back to.
+              <b>The conversation, as a map.</b> Every prompt is a dot on a branch, so a repeat is pointed back to.
             </li>
             <li>
-              <b>How the team works.</b> The steps teammates took and what they reused, offered to the next person.
+              <b>How the team works.</b> The steps teammates took and what they reused.
             </li>
             <li>
-              <b>What you taught it.</b> Explain a prompt once, and that kind is not questioned again.
+              <b>What you taught it.</b> Explain a prompt once and that kind is not questioned again.
             </li>
             <li>
-              <b>Everything it did.</b> Each check, tool call and approval is logged for the manager, without what was
-              typed.
+              <b>Everything it did.</b> Each check, tool call and approval, logged without what was typed.
             </li>
           </ul>
         </section>
 
         <footer className="intro__foot">
           <a className="intro__start" href="#">
-            Start the live demo
+            {live ? 'Start the live demo' : 'Try the scripted preview'}
+            <kbd>Enter</kbd>
           </a>
           <a className="intro__more" href="#manager">
             See the manager's side

@@ -1,14 +1,27 @@
 /* The screen to leave up between demos: how a prompt moves through Layers. */
 
 .intro {
-  display: grid;
-  align-content: center;
-  gap: clamp(20px, 3.4vh, 36px);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2.6vh, 34px);
   width: min(1180px, 100%);
   height: 100dvh;
   margin: 0 auto;
-  padding: 72px 32px 36px;
+  padding: clamp(18px, 3.4vh, 40px) 32px clamp(16px, 3vh, 32px);
   overflow-y: auto;
+}
+
+/* Centred when there is room, and from the top when there is not, so nothing is cut off. */
+.intro > * {
+  flex: none;
+}
+
+.intro > :first-child {
+  margin-top: auto;
+}
+
+.intro > :last-child {
+  margin-bottom: auto;
 }
 
 .intro p,
@@ -21,7 +34,7 @@
 
 .intro__head {
   display: grid;
-  gap: 10px;
+  gap: clamp(6px, 1.1vh, 10px);
 }
 
 .intro__brand {
@@ -35,12 +48,12 @@
 }
 
 .intro__brand .glyph {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
 }
 
 .intro h1 {
-  font-size: clamp(30px, 4.2vw, 54px);
+  font-size: clamp(28px, min(4.2vw, 5.6vh), 54px);
   font-weight: 680;
   font-stretch: var(--w-wide);
   line-height: 1.06;
@@ -53,156 +66,223 @@
 }
 
 .intro__sub {
-  max-width: 68ch;
-  font-size: clamp(15px, 1.25vw, 18px);
+  max-width: 92ch;
+  font-size: clamp(14.5px, min(1.25vw, 2.1vh), 18px);
   line-height: 1.45;
   color: var(--ink-2);
   text-wrap: pretty;
 }
 
-/* The flow: one prompt, five stages, lit in order. */
+/* The flow: one prompt in the chat box, then its path along the line. */
 
 .intro__flow {
   display: grid;
-  gap: 14px;
-  padding: 20px 22px 16px;
-  border-radius: 22px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(8px, 1.4vh, 14px);
+  padding: 12px 12px clamp(6px, 1.2vh, 12px);
+  border-radius: 28px;
   background: var(--surface);
   box-shadow: var(--shadow-bubble);
 }
 
-.intro__prompt {
+.intro__flow > :not(.intro__box) {
+  margin-inline: 14px;
+}
+
+/* The chat box, as the workspace draws it. Its corner is the panel's, less the gap between them. */
+.intro__box {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 12px;
-  min-height: 1.5em;
-  font-size: clamp(17px, 1.6vw, 22px);
-  font-weight: 560;
+  min-height: clamp(48px, 7.2vh, 60px);
+  padding: 6px 6px 6px 18px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 16px;
+}
+
+.intro__prompt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(16px, 2.5vh, 21px);
+  font-weight: 540;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   animation: land 420ms var(--ease-out);
 }
 
-.intro__prompt span {
+.intro__send {
+  display: grid;
   flex: none;
-  font-size: 12.5px;
-  font-weight: 460;
+  place-items: center;
+  width: clamp(36px, 5.6vh, 46px);
+  height: clamp(36px, 5.6vh, 46px);
+  border-radius: 10px;
+  background: var(--well);
   color: var(--ink-3);
+  transition:
+    background var(--t-med),
+    color var(--t-med),
+    transform var(--t-fast) var(--ease-out);
 }
 
-.intro__stages {
+.intro__box[data-sent] .intro__send {
+  background: var(--ink);
+  color: #fff;
+  transform: scale(0.94);
+}
+
+/* Five stages on one line. A stage is a dot, the same dot the branch map uses for a prompt. */
+
+.intro__track {
+  --node: 16px;
+  --gap: clamp(14px, 1.8vw, 26px);
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 22px;
-  padding: 0;
+  gap: var(--gap);
+  padding: clamp(4px, 1vh, 10px) 0 0;
   list-style: none;
 }
 
-.intro__stages li {
+.intro__track li {
   position: relative;
   display: grid;
   align-content: start;
-  gap: 4px;
-  min-height: 150px;
-  padding: 14px 14px 12px;
-  border: 1.5px solid var(--line);
-  border-radius: 16px;
-  background: var(--canvas);
-  transition:
-    border-color var(--t-med),
-    background var(--t-med),
-    opacity var(--t-med),
-    transform var(--t-med) var(--ease-out);
+  gap: 3px;
 }
 
-/* The line into each stage from the one before it. */
-.intro__stages li + li::before {
+.intro__node {
+  position: relative;
+  width: var(--node);
+  height: var(--node);
+  margin-bottom: clamp(4px, 1vh, 9px);
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  transition:
+    background var(--t-med) var(--node-d, 0ms),
+    border-color var(--t-med) var(--node-d, 0ms),
+    transform var(--t-med) var(--ease-out) var(--node-d, 0ms);
+}
+
+/* The way to the next stage: dotted until the prompt travels it. */
+.intro__track li:not(:last-child)::before,
+.intro__track li:not(:last-child)::after {
   content: '';
   position: absolute;
-  top: 50%;
-  right: 100%;
-  width: 22px;
+  top: calc(var(--node) / 2 - 1px);
+  left: var(--node);
+  width: calc(100% + var(--gap) - var(--node));
   height: 2px;
-  margin-right: 1.5px;
-  background: var(--line-strong);
-  transition: background var(--t-med);
 }
 
-.intro__stages li[data-skip] {
-  opacity: 0.42;
+.intro__track li:not(:last-child)::before {
+  background: repeating-linear-gradient(90deg, var(--line-strong) 0 3px, transparent 3px 8px);
 }
 
-.intro__stages li[data-tone] {
-  background: var(--surface);
-  transform: translateY(-3px);
+.intro__track li:not(:last-child)::after {
+  background: var(--agent);
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 320ms var(--ease-out) var(--line-d, 0ms);
 }
 
-.intro__stages li[data-tone='go'] {
+.intro__track li[data-out]::after {
+  transform: scaleX(1);
+}
+
+.intro__track li[data-tone='go'] .intro__node {
   border-color: var(--agent);
-}
-
-.intro__stages li[data-tone='ask'] {
-  border-color: var(--layer-orange);
-}
-
-.intro__stages li[data-tone='stop'] {
-  border-color: var(--layer-red);
-}
-
-.intro__stages li[data-tone='go']::before {
   background: var(--agent);
 }
 
-.intro__stages li[data-tone='ask']::before {
+.intro__track li[data-tone='ask'] .intro__node {
+  border-color: var(--layer-orange);
   background: var(--layer-orange);
 }
 
-.intro__stages li[data-tone='stop']::before {
+.intro__track li[data-tone='stop'] .intro__node {
+  border-color: var(--layer-red);
   background: var(--layer-red);
 }
 
-.intro__kind {
-  font-size: 11.5px;
-  color: var(--ink-3);
+/* A stage the prompt went past without stopping. */
+.intro__track li[data-pass] .intro__node {
+  border-color: var(--agent);
+  transform: scale(0.6);
 }
 
-.intro__stages h2 {
-  font-size: 16.5px;
+/* A dead end, drawn as the branch map draws a stopped prompt: a wall across the line. */
+.intro__node::after {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: calc(100% + 5px);
+  width: 3px;
+  height: calc(var(--node) + 10px);
+  border-radius: 2px;
+  background: var(--layer-red);
+  transform: scaleY(0);
+  transition: transform var(--t-med) var(--ease-out) var(--node-d, 0ms);
+}
+
+.intro__track li[data-tone='stop'] .intro__node::after {
+  transform: scaleY(1);
+}
+
+.intro__track h2 {
+  font-size: clamp(16px, 2.5vh, 21px);
   font-weight: 650;
   font-stretch: var(--w-wide);
+  line-height: 1.2;
+  transition: color var(--t-med);
 }
 
+/* Three lines for every stage, so what each one did with the prompt lines up across the row. */
 .intro__does {
-  font-size: 12.5px;
+  min-height: 4.2em;
+  font-size: clamp(13px, 1.9vh, 15.5px);
   line-height: 1.4;
   color: var(--ink-2);
+  text-wrap: pretty;
+  transition: color var(--t-med);
+}
+
+.intro__track li[data-skip] h2,
+.intro__track li[data-skip] .intro__does {
+  color: var(--ink-3);
 }
 
 /* What this stage did with this prompt. */
 .intro__says {
-  align-self: end;
   min-height: 2.7em;
-  padding-top: 6px;
-  font-size: 13px;
+  padding-top: 3px;
+  font-size: clamp(13px, 1.9vh, 15.5px);
   font-weight: 620;
   line-height: 1.35;
 }
 
-.intro__stages li[data-tone='go'] .intro__says {
+.intro__says:not(:empty) {
+  animation: land 320ms var(--ease-out) var(--node-d, 0ms) both;
+}
+
+.intro__track li[data-tone='go'] .intro__says {
   color: var(--agent-ink);
 }
 
-.intro__stages li[data-tone='ask'] .intro__says {
+.intro__track li[data-tone='ask'] .intro__says {
   color: #9a5a00;
 }
 
-.intro__stages li[data-tone='stop'] .intro__says {
+.intro__track li[data-tone='stop'] .intro__says {
   color: #b3261a;
 }
 
 .intro__line {
-  min-height: 2.9em;
-  font-size: 15px;
+  min-height: 1.45em;
+  font-size: clamp(14.5px, 2.15vh, 17px);
   line-height: 1.45;
-  color: var(--ink-2);
+  color: var(--ink);
   opacity: 0;
   transition: opacity var(--t-med);
   text-wrap: pretty;
@@ -212,26 +292,59 @@
   opacity: 1;
 }
 
-.intro__dots {
+/* The examples. Each bar is a small target, so the button around it is the size of a fingertip. */
+
+.intro__picks {
   display: flex;
-  gap: 6px;
+  margin-top: -6px;
+  margin-left: 11px;
 }
 
-.intro__dots button {
-  width: 22px;
-  height: 6px;
+.intro__picks button {
+  position: relative;
+  width: 28px;
+  height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 3px;
-  background: var(--line-strong);
-  transition:
-    width var(--t-med) var(--ease-out),
-    background var(--t-med);
+  background: none;
+  transition: width var(--t-med) var(--ease-out);
 }
 
-.intro__dots button[aria-pressed='true'] {
-  width: 44px;
+.intro__picks button::before,
+.intro__picks button::after {
+  content: '';
+  position: absolute;
+  top: 11px;
+  right: 3px;
+  left: 3px;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.intro__picks button::before {
+  background: var(--line-strong);
+  transition: background var(--t-fast);
+}
+
+.intro__picks button:hover::before {
+  background: var(--ink-3);
+}
+
+.intro__picks button[aria-pressed='true'] {
+  width: 52px;
+}
+
+/* The bar of the example on screen fills as its time runs. */
+.intro__picks button[aria-pressed='true']::after {
   background: var(--ink);
+  transform-origin: left center;
+  animation: intro-fill var(--dur, 6s) linear both;
+}
+
+@keyframes intro-fill {
+  from {
+    transform: scaleX(0);
+  }
 }
 
 /* What it remembers. */
@@ -239,17 +352,21 @@
 .intro__memory ul {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 22px;
-  padding: 0;
+  gap: clamp(14px, 1.8vw, 26px);
+  padding: 0 26px;
   list-style: none;
-  font-size: 13.5px;
+  font-size: clamp(13px, 1.85vh, 15px);
   line-height: 1.45;
   color: var(--ink-2);
 }
 
+.intro__memory li {
+  text-wrap: pretty;
+}
+
 .intro__memory b {
   display: block;
-  margin-bottom: 2px;
+  margin-bottom: 1px;
   font-weight: 640;
   color: var(--ink);
 }
@@ -258,25 +375,43 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px 20px;
+  gap: 10px 20px;
+  padding: 0 26px;
 }
 
 .intro__start {
-  display: inline-grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   height: 48px;
-  padding: 0 22px;
+  padding: 0 12px 0 20px;
   border-radius: 14px;
   background: var(--agent);
   color: #fff;
   font-size: 16px;
   font-weight: 640;
   text-decoration: none;
-  transition: background var(--t-fast);
+  transition:
+    background var(--t-fast),
+    transform var(--t-fast) var(--ease-out);
 }
 
 .intro__start:hover {
   background: var(--agent-press);
+}
+
+.intro__start:active {
+  transform: scale(0.98);
+}
+
+.intro__start kbd {
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.18);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .intro__more {
@@ -296,44 +431,153 @@
   outline-offset: 2px;
 }
 
+/* A narrow window: the line runs down the page, and the button stays in reach. */
 @media (max-width: 900px) {
   .intro {
-    align-content: start;
-    padding: 64px 16px 24px;
+    padding-inline: 16px;
+    padding-bottom: 0;
   }
 
-  .intro__stages {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
+  .intro > :last-child {
+    margin-bottom: 0;
   }
 
-  .intro__stages li {
+  .intro__sub {
+    max-width: none;
+  }
+
+  .intro__box {
+    padding-block: 8px;
+  }
+
+  .intro__prompt {
+    white-space: normal;
+  }
+
+  .intro__does {
     min-height: 0;
   }
 
-  .intro__stages li + li::before {
-    top: auto;
-    right: auto;
-    bottom: 100%;
-    left: 24px;
+  .intro__flow > :not(.intro__box) {
+    margin-inline: 8px;
+  }
+
+  .intro__track {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .intro__track li {
+    grid-template-columns: var(--node) minmax(0, 1fr);
+    column-gap: 12px;
+    padding-bottom: 14px;
+  }
+
+  .intro__track li:last-child {
+    padding-bottom: 0;
+  }
+
+  .intro__node {
+    grid-row: 1 / span 3;
+    margin: 3px 0 0;
+  }
+
+  .intro__track li:not(:last-child)::before,
+  .intro__track li:not(:last-child)::after {
+    top: calc(var(--node) + 3px);
+    bottom: -3px;
+    left: calc(var(--node) / 2 - 1px);
     width: 2px;
-    height: 14px;
-    margin: 0 0 1.5px;
+    height: auto;
+  }
+
+  .intro__track li:not(:last-child)::before {
+    background: repeating-linear-gradient(180deg, var(--line-strong) 0 3px, transparent 3px 8px);
+  }
+
+  .intro__track li:not(:last-child)::after {
+    transform: scaleY(0);
+    transform-origin: center top;
+  }
+
+  .intro__track li[data-out]::after {
+    transform: scaleY(1);
+  }
+
+  /* The wall turns to cross a line that now runs downwards. */
+  .intro__node::after {
+    top: calc(100% + 5px);
+    left: -7px;
+    width: calc(var(--node) + 10px);
+    height: 3px;
+    transform: scaleX(0);
+  }
+
+  .intro__track li[data-tone='stop'] .intro__node::after {
+    transform: scaleX(1);
+  }
+
+  .intro__says {
+    min-height: 0;
+  }
+
+  .intro__says:empty {
+    display: none;
+  }
+
+  .intro__line {
+    min-height: 4.35em;
+  }
+
+  .intro__picks {
+    margin-left: 5px;
   }
 
   .intro__memory ul {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 0 8px;
+  }
+
+  .intro__foot {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    margin: 0 -16px;
+    padding: 12px 16px;
+    border-top: 1px solid var(--line);
+    background: var(--canvas);
   }
 
   .intro__foot p {
-    margin-left: 0;
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .intro__memory ul {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .intro__start {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .intro__start kbd {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro__stages li,
+  .intro__node,
+  .intro__node::after,
+  .intro__track li::after,
   .intro__prompt,
-  .intro__line {
+  .intro__says,
+  .intro__line,
+  .intro__send,
+  .intro__picks button,
+  .intro__picks button::after {
     animation: none;
     transition: none;
   }

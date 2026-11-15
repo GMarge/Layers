@@ -1,4 +1,5 @@
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/archivo/wdth.css';
 import '@fontsource-variable/martian-mono/wdth.css';
@@ -58,7 +59,7 @@ function TryMenu({ view }: { view: View }) {
       const frame = document.querySelector<HTMLIFrameElement>('.split iframe');
       (frame?.contentWindow ?? window).dispatchEvent(new CustomEvent(TRY_EVENT, { detail: id }));
     };
-    if (view === 'manager' || view === 'intro') {
+    if (view === 'manager') {
       window.location.hash = '';
       setTimeout(fire, 300);
     } else fire();
@@ -122,13 +123,34 @@ function TryMenu({ view }: { view: View }) {
 }
 
 /**
- * One address, three views. The employee's workspace stays mounted while the manager's
- * view is showing, so a request sent for approval is still there when you hop back.
+ * One address, three views and the idle screen. The employee's workspace stays mounted while
+ * the manager's view is showing, so a request sent for approval is still there when you hop back.
+ *
+ * The idle screen stands alone: the bar that drives the demo is not on it, and pops in once
+ * the demo has started.
  */
 function Root() {
   const [view, setView] = useState<View>(viewOf(window.location.hash));
+  /** True when the demo was just entered from the idle screen, so the bar pops in instead of simply being there. */
+  const [entered, setEntered] = useState(false);
+  const shown = useRef(view);
   useEffect(() => {
-    const onChange = () => setView(viewOf(window.location.hash));
+    const onChange = () => {
+      const next = viewOf(window.location.hash);
+      const from = shown.current;
+      if (next === from) return;
+      shown.current = next;
+      const apply = () => {
+        setEntered(from === 'intro');
+        setView(next);
+      };
+      // Into and out of the idle screen the page cross-fades instead of cutting, where the browser can.
+      const glide = (document as unknown as { startViewTransition?: (run: () => void) => unknown }).startViewTransition;
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if ((from === 'intro' || next === 'intro') && typeof glide === 'function' && !still) {
+        glide.call(document, () => flushSync(apply));
+      } else apply();
+    };
     window.addEventListener('hashchange', onChange);
     return () => window.removeEventListener('hashchange', onChange);
   }, []);
@@ -146,8 +168,8 @@ function Root() {
           <iframe title="Manager view" src="/#manager" />
         </div>
       )}
-      {!embedded && (
-        <nav className="views" data-view={view} aria-label="Demo view">
+      {!embedded && view !== 'intro' && (
+        <nav className="views" data-view={view} data-pop={entered ? '' : undefined} aria-label="Demo view">
           {VIEWS.map(([name, href, label]) => (
             <a key={name} href={href} data-view={name} aria-current={view === name ? 'page' : undefined}>
               {label}
