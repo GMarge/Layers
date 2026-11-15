@@ -825,6 +825,11 @@
   background: #2a2a33;
 }
 
+.views__menu button[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .views__menu b {
   font-size: 13px;
   font-weight: 600;

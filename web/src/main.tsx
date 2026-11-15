@@ -30,8 +30,8 @@ const VIEWS: [View, string, string][] = [
 /** The demo's examples, one click each. Every one plays in the employee's workspace. */
 function TryMenu({ view }: { view: View }) {
   const [open, setOpen] = useState(false);
-  /** Today's model runs, read when the menu opens. Null when there is no server to ask. */
-  const [runs, setRuns] = useState<{ used: number; cap: number } | null>(null);
+  /** Today's model runs, read when the menu opens. Null when there is no server to ask, undefined until it answers. */
+  const [runs, setRuns] = useState<{ used: number; cap: number } | null | undefined>(undefined);
   useEffect(() => {
     if (!open) return;
     fetch('/api/settings')
@@ -59,6 +59,8 @@ function TryMenu({ view }: { view: View }) {
 
   const play = (id: string) => {
     if (id === 'runs') {
+      // A copy with no server has no model and no count, so there is nothing to do.
+      if (!runs) return;
       // The menu stays open, so the count going back to zero is the confirmation.
       void fetch('/api/runs/reset', { method: 'POST' })
         .then((r) => (r.ok ? r.json() : null))
@@ -85,15 +87,22 @@ function TryMenu({ view }: { view: View }) {
   const group = (title: string, items: TryItem[]) => (
     <>
       <p>{title}</p>
-      {items
-        // Resetting the count needs the server, so a copy without one does not offer it.
-        .filter((item) => item.id !== 'runs' || runs)
-        .map((item) => (
-          <button key={item.id} type="button" role="menuitem" onClick={() => play(item.id)}>
+      {items.map((item) => {
+        // The count lives on the server. A copy without one says so, instead of leaving the item out.
+        const none = item.id === 'runs' && runs === null;
+        const hint =
+          item.id !== 'runs' || runs === undefined
+            ? item.hint
+            : runs
+              ? `${runs.used} of ${runs.cap} used today. Sets it back to zero.`
+              : 'Not on this copy. It has no model, so no runs are counted.';
+        return (
+          <button key={item.id} type="button" role="menuitem" aria-disabled={none || undefined} onClick={() => play(item.id)}>
             <b>{item.label}</b>
-            <span>{item.id === 'runs' && runs ? `${runs.used} of ${runs.cap} used today. Sets it back to zero.` : item.hint}</span>
+            <span>{hint}</span>
           </button>
-        ))}
+        );
+      })}
     </>
   );
 
